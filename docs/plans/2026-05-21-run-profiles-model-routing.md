@@ -101,28 +101,28 @@ Do not implement this section in the current PR.
 
 ### Task 2: Apply Profile With Correct Precedence
 
-- [ ] Add profile application so selected config `run_profile` overlays normal
+- [x] Add profile application so selected config `run_profile` overlays normal
       config values before CLI direct flags are applied.
-- [ ] Add `--run-profile=<name>` CLI override.
-- [ ] Ensure CLI direct flags still win after profile application:
+- [x] Add `--run-profile=<name>` CLI override.
+- [x] Ensure CLI direct flags still win after profile application:
       `--claude-command`, `--claude-args`, `--task-model`, `--review-model`,
       `--external-reviewers`, `--external-review-tool`,
       `--custom-review-script`.
-- [ ] Return a clear error when a selected profile name does not exist.
-- [ ] Add tests in `pkg/config/config_test.go` and `cmd/ralphex/main_test.go`
+- [x] Return a clear error when a selected profile name does not exist.
+- [x] Add tests in `pkg/config/config_test.go` and `cmd/ralphex/main_test.go`
       for config-selected profile, CLI-selected profile, missing profile, and
       direct CLI override after profile.
-- [ ] Run `go test ./pkg/config ./cmd/ralphex -run 'RunProfile|ProviderOverride|Load' -count=1`.
+- [x] Run `go test ./pkg/config ./cmd/ralphex -run 'RunProfile|ProviderOverride|Load' -count=1`.
 
 ### Task 3: Documentation and Defaults
 
-- [ ] Document `run_profile` and `[run_profile.<name>]` in
+- [x] Document `run_profile` and `[run_profile.<name>]` in
       `pkg/config/defaults/config`.
-- [ ] Add README documentation near the provider/model-routing section.
-- [ ] Include a `claude-p` example using `Equality-Machine/claude-p`.
-- [ ] State explicitly that `clarp` is not the default recommended adapter
+- [x] Add README documentation near the provider/model-routing section.
+- [x] Include a `claude-p` example using `Equality-Machine/claude-p`.
+- [x] State explicitly that `clarp` is not the default recommended adapter
       because it uses a proxy/`ANTHROPIC_BASE_URL` approach.
-- [ ] Update `CLAUDE.md` with the new config surface and precedence.
+- [x] Update `CLAUDE.md` with the new config surface and precedence.
 
 ### Task 4: Verification
 
