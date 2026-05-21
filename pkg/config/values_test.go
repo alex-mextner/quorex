@@ -2532,3 +2532,188 @@ func TestValues_mergeFrom_ReviewModel(t *testing.T) {
 		assert.Equal(t, "haiku", values.ReviewModel)
 	})
 }
+
+func TestValuesLoader_Load_RunProfile_Selected(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config")
+
+	configContent := `
+run_profile = claude-p-sonnet
+
+[run_profile.claude-p-sonnet]
+claude_command = claude-p
+claude_args = --dangerously-skip-permissions --output-format stream-json --verbose
+task_model = sonnet
+review_model = sonnet
+`
+	require.NoError(t, os.WriteFile(configPath, []byte(configContent), 0o600))
+
+	loader := newValuesLoader(defaultsFS)
+	values, err := loader.Load("", configPath)
+	require.NoError(t, err)
+
+	assert.Equal(t, "claude-p-sonnet", values.RunProfile)
+	require.Len(t, values.RunProfileDefinitions, 1)
+	p := values.RunProfileDefinitions[0]
+	assert.Equal(t, "claude-p-sonnet", p.Name)
+	assert.Equal(t, "claude-p", p.ClaudeCommand)
+	assert.Equal(t, "--dangerously-skip-permissions --output-format stream-json --verbose", p.ClaudeArgs)
+	assert.Equal(t, "sonnet", p.TaskModel)
+	assert.Equal(t, "sonnet", p.ReviewModel)
+}
+
+func TestValuesLoader_Load_RunProfile_NoProfile(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config")
+
+	configContent := `claude_command = claude`
+	require.NoError(t, os.WriteFile(configPath, []byte(configContent), 0o600))
+
+	loader := newValuesLoader(defaultsFS)
+	values, err := loader.Load("", configPath)
+	require.NoError(t, err)
+
+	assert.Empty(t, values.RunProfile)
+	assert.Empty(t, values.RunProfileDefinitions)
+}
+
+func TestValuesLoader_Load_RunProfile_MultipleDefinitions(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config")
+
+	configContent := `
+run_profile = fast
+
+[run_profile.fast]
+claude_command = claude
+task_model = haiku
+review_model = haiku
+
+[run_profile.quality]
+claude_command = claude
+task_model = opus
+review_model = sonnet
+custom_review_script = /path/to/review.sh
+`
+	require.NoError(t, os.WriteFile(configPath, []byte(configContent), 0o600))
+
+	loader := newValuesLoader(defaultsFS)
+	values, err := loader.Load("", configPath)
+	require.NoError(t, err)
+
+	assert.Equal(t, "fast", values.RunProfile)
+	require.Len(t, values.RunProfileDefinitions, 2)
+
+	byName := make(map[string]RunProfile)
+	for _, p := range values.RunProfileDefinitions {
+		byName[p.Name] = p
+	}
+
+	fast, ok := byName["fast"]
+	require.True(t, ok)
+	assert.Equal(t, "claude", fast.ClaudeCommand)
+	assert.Equal(t, "haiku", fast.TaskModel)
+	assert.Equal(t, "haiku", fast.ReviewModel)
+
+	quality, ok := byName["quality"]
+	require.True(t, ok)
+	assert.Equal(t, "claude", quality.ClaudeCommand)
+	assert.Equal(t, "opus", quality.TaskModel)
+	assert.Equal(t, "sonnet", quality.ReviewModel)
+	assert.Equal(t, "/path/to/review.sh", quality.CustomReviewScript)
+}
+
+func TestValuesLoader_Load_RunProfile_WithExternalReviewers(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config")
+
+	configContent := `
+run_profile = full-review
+
+[run_profile.full-review]
+claude_command = claude
+task_model = sonnet
+external_reviewers = deepseek,codex
+external_review_tool = custom
+`
+	require.NoError(t, os.WriteFile(configPath, []byte(configContent), 0o600))
+
+	loader := newValuesLoader(defaultsFS)
+	values, err := loader.Load("", configPath)
+	require.NoError(t, err)
+
+	assert.Equal(t, "full-review", values.RunProfile)
+	require.Len(t, values.RunProfileDefinitions, 1)
+	p := values.RunProfileDefinitions[0]
+	assert.Equal(t, "deepseek,codex", p.ExternalReviewers)
+	assert.Equal(t, "custom", p.ExternalReviewTool)
+}
+
+func TestValuesLoader_Load_RunProfile_LocalOverridesGlobal(t *testing.T) {
+	tmpDir := t.TempDir()
+	globalConfig := filepath.Join(tmpDir, "global")
+	localConfig := filepath.Join(tmpDir, "local")
+
+	globalContent := `
+run_profile = fast
+
+[run_profile.fast]
+task_model = haiku
+`
+	require.NoError(t, os.WriteFile(globalConfig, []byte(globalContent), 0o600))
+
+	localContent := `
+run_profile = quality
+
+[run_profile.quality]
+task_model = opus
+`
+	require.NoError(t, os.WriteFile(localConfig, []byte(localContent), 0o600))
+
+	loader := newValuesLoader(defaultsFS)
+	values, err := loader.Load(localConfig, globalConfig)
+	require.NoError(t, err)
+
+	// local profile name wins
+	assert.Equal(t, "quality", values.RunProfile)
+	// both profile definitions are merged
+	byName := make(map[string]RunProfile)
+	for _, p := range values.RunProfileDefinitions {
+		byName[p.Name] = p
+	}
+	assert.Contains(t, byName, "fast")
+	assert.Contains(t, byName, "quality")
+	assert.Equal(t, "haiku", byName["fast"].TaskModel)
+	assert.Equal(t, "opus", byName["quality"].TaskModel)
+}
+
+func TestValues_mergeFrom_RunProfile(t *testing.T) {
+	t.Run("merge run profile name", func(t *testing.T) {
+		dst := Values{RunProfile: "old"}
+		src := Values{RunProfile: "new"}
+		dst.mergeFrom(&src)
+		assert.Equal(t, "new", dst.RunProfile)
+	})
+
+	t.Run("empty source preserves existing", func(t *testing.T) {
+		dst := Values{RunProfile: "existing"}
+		src := Values{RunProfile: ""}
+		dst.mergeFrom(&src)
+		assert.Equal(t, "existing", dst.RunProfile)
+	})
+
+	t.Run("merge profile definitions", func(t *testing.T) {
+		dst := Values{RunProfileDefinitions: []RunProfile{{Name: "fast", TaskModel: "haiku"}}}
+		src := Values{RunProfileDefinitions: []RunProfile{{Name: "quality", TaskModel: "opus"}}}
+		dst.mergeFrom(&src)
+		assert.Len(t, dst.RunProfileDefinitions, 2)
+	})
+
+	t.Run("src definition overrides dst definition with same name", func(t *testing.T) {
+		dst := Values{RunProfileDefinitions: []RunProfile{{Name: "fast", TaskModel: "haiku"}}}
+		src := Values{RunProfileDefinitions: []RunProfile{{Name: "fast", TaskModel: "sonnet"}}}
+		dst.mergeFrom(&src)
+		require.Len(t, dst.RunProfileDefinitions, 1)
+		assert.Equal(t, "sonnet", dst.RunProfileDefinitions[0].TaskModel)
+	})
+}
