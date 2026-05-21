@@ -34,8 +34,8 @@ type opts struct {
 	MaxIterations           int           `short:"m" long:"max-iterations" description:"maximum task iterations (default: 50)"`
 	MaxExternalIterations   int           `long:"max-external-iterations" default:"0" description:"override external review iteration limit (0 = auto)"`
 	ReviewPatience          int           `long:"review-patience" default:"0" description:"terminate external review after N unchanged rounds (0 = disabled)"`
-	TaskModel               string        `long:"task-model" description:"model for task execution as model[:effort] (e.g., opus, opus:high, :medium)"`
-	ReviewModel             string        `long:"review-model" description:"model for review phases as model[:effort] (falls back to --task-model)"`
+	TaskModel               string        `long:"task-model" description:"model for task execution as model[:effort] (e.g., opus, opus:high, :medium); empty clears configured model"`
+	ReviewModel             string        `long:"review-model" description:"model for review phases as model[:effort] (falls back to --task-model); empty clears configured model"`
 	ClaudeCommand           string        `long:"claude-command" description:"override claude-compatible command for this run"`
 	ClaudeArgs              string        `long:"claude-args" description:"override claude-compatible command args for this run"`
 	ExternalReviewTool      string        `long:"external-review-tool" choice:"codex" choice:"custom" choice:"none" description:"override external review tool for this run"`
@@ -66,7 +66,7 @@ type opts struct {
 	DumpDefaults            string        `long:"dump-defaults" description:"extract raw embedded defaults to specified directory"`
 	ConfigDir               string        `long:"config-dir" env:"RALPHEX_CONFIG_DIR" description:"custom config directory"`
 
-	RunProfile string `long:"run-profile" description:"select a named run profile from config"`
+	RunProfile string `long:"run-profile" description:"select a named run profile from config; empty disables configured profile"`
 
 	PlanFile string `positional-arg-name:"plan-file" description:"path to plan file (optional, uses fzf if omitted)"`
 
@@ -77,9 +77,12 @@ type opts struct {
 
 	claudeCommandSet      bool
 	claudeArgsSet         bool
+	taskModelSet          bool
+	reviewModelSet        bool
 	externalReviewToolSet bool
 	externalReviewersSet  bool
 	customReviewScriptSet bool
+	runProfileSet         bool
 }
 
 // markFlagsSet detects which duration flags were explicitly provided on the CLI
@@ -93,9 +96,12 @@ func (o *opts) markFlagsSet(parser *flags.Parser) {
 	o.idleTimeoutSet = isFlagSet(parser, "idle-timeout")
 	o.claudeCommandSet = isFlagSet(parser, "claude-command")
 	o.claudeArgsSet = isFlagSet(parser, "claude-args")
+	o.taskModelSet = isFlagSet(parser, "task-model")
+	o.reviewModelSet = isFlagSet(parser, "review-model")
 	o.externalReviewToolSet = isFlagSet(parser, "external-review-tool")
 	o.externalReviewersSet = isFlagSet(parser, "external-reviewers")
 	o.customReviewScriptSet = isFlagSet(parser, "custom-review-script")
+	o.runProfileSet = isFlagSet(parser, "run-profile")
 }
 
 var revision = "unknown"
@@ -256,10 +262,7 @@ func run(ctx context.Context, o opts) error {
 	}
 
 	// apply run profile: CLI --run-profile takes precedence over config run_profile
-	effectiveProfile := o.RunProfile
-	if effectiveProfile == "" {
-		effectiveProfile = cfg.RunProfile
-	}
+	effectiveProfile := resolveRunProfile(o, cfg)
 	if effectiveProfile != "" {
 		if profileErr := cfg.ApplyProfile(effectiveProfile); profileErr != nil {
 			return fmt.Errorf("apply run profile: %w", profileErr)
@@ -918,13 +921,13 @@ func createRunner(req executePlanRequest, o opts, log processor.Logger, holder *
 
 	// resolve task model: CLI flag > config file > empty (use CLI default)
 	taskModel := req.Config.TaskModel
-	if o.TaskModel != "" {
+	if o.taskModelSet {
 		taskModel = o.TaskModel
 	}
 
 	// resolve review model: CLI flag > config file > empty (falls back to task_model in processor)
 	reviewModel := req.Config.ReviewModel
-	if o.ReviewModel != "" {
+	if o.reviewModelSet {
 		reviewModel = o.ReviewModel
 	}
 
@@ -1324,6 +1327,12 @@ func applyCLIOverrides(o opts, cfg *config.Config) {
 		cfg.ClaudeArgs = o.ClaudeArgs
 		cfg.ClaudeArgsSet = true
 	}
+	if o.taskModelSet {
+		cfg.TaskModel = o.TaskModel
+	}
+	if o.reviewModelSet {
+		cfg.ReviewModel = o.ReviewModel
+	}
 	if o.externalReviewToolSet {
 		cfg.ExternalReviewTool = o.ExternalReviewTool
 		cfg.ExternalReviewers = nil
@@ -1336,6 +1345,13 @@ func applyCLIOverrides(o opts, cfg *config.Config) {
 	if o.customReviewScriptSet {
 		cfg.CustomReviewScript = o.CustomReviewScript
 	}
+}
+
+func resolveRunProfile(o opts, cfg *config.Config) string {
+	if o.runProfileSet {
+		return o.RunProfile
+	}
+	return cfg.RunProfile
 }
 
 // isFlagSet returns true if the named CLI flag was explicitly provided on the command line.

@@ -2490,6 +2490,14 @@ func TestValues_mergeFrom_TaskModel(t *testing.T) {
 		assert.Equal(t, "opus", dst.TaskModel)
 	})
 
+	t.Run("explicit empty clears existing", func(t *testing.T) {
+		dst := Values{TaskModel: "opus"}
+		src := Values{TaskModelSet: true}
+		dst.mergeFrom(&src)
+		assert.Empty(t, dst.TaskModel)
+		assert.True(t, dst.TaskModelSet)
+	})
+
 	t.Run("local overrides global", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		globalCfg := filepath.Join(tmpDir, "global")
@@ -2501,6 +2509,20 @@ func TestValues_mergeFrom_TaskModel(t *testing.T) {
 		values, err := loader.Load(localCfg, globalCfg)
 		require.NoError(t, err)
 		assert.Equal(t, "haiku", values.TaskModel)
+	})
+
+	t.Run("local empty clears global", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		globalCfg := filepath.Join(tmpDir, "global")
+		localCfg := filepath.Join(tmpDir, "local")
+		require.NoError(t, os.WriteFile(globalCfg, []byte(`task_model = opus`), 0o600))
+		require.NoError(t, os.WriteFile(localCfg, []byte(`task_model =`), 0o600))
+
+		loader := newValuesLoader(defaultsFS)
+		values, err := loader.Load(localCfg, globalCfg)
+		require.NoError(t, err)
+		assert.Empty(t, values.TaskModel)
+		assert.True(t, values.TaskModelSet)
 	})
 }
 
@@ -2519,6 +2541,14 @@ func TestValues_mergeFrom_ReviewModel(t *testing.T) {
 		assert.Equal(t, "sonnet", dst.ReviewModel)
 	})
 
+	t.Run("explicit empty clears existing", func(t *testing.T) {
+		dst := Values{ReviewModel: "sonnet"}
+		src := Values{ReviewModelSet: true}
+		dst.mergeFrom(&src)
+		assert.Empty(t, dst.ReviewModel)
+		assert.True(t, dst.ReviewModelSet)
+	})
+
 	t.Run("local overrides global", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		globalCfg := filepath.Join(tmpDir, "global")
@@ -2530,6 +2560,20 @@ func TestValues_mergeFrom_ReviewModel(t *testing.T) {
 		values, err := loader.Load(localCfg, globalCfg)
 		require.NoError(t, err)
 		assert.Equal(t, "haiku", values.ReviewModel)
+	})
+
+	t.Run("local empty clears global", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		globalCfg := filepath.Join(tmpDir, "global")
+		localCfg := filepath.Join(tmpDir, "local")
+		require.NoError(t, os.WriteFile(globalCfg, []byte(`review_model = sonnet`), 0o600))
+		require.NoError(t, os.WriteFile(localCfg, []byte(`review_model =`), 0o600))
+
+		loader := newValuesLoader(defaultsFS)
+		values, err := loader.Load(localCfg, globalCfg)
+		require.NoError(t, err)
+		assert.Empty(t, values.ReviewModel)
+		assert.True(t, values.ReviewModelSet)
 	})
 }
 
@@ -2690,6 +2734,67 @@ task_model = opus
 	assert.Equal(t, "opus", byName["quality"].TaskModel)
 }
 
+func TestValuesLoader_Load_RunProfile_LocalMergesGlobalSameName(t *testing.T) {
+	tmpDir := t.TempDir()
+	globalConfig := filepath.Join(tmpDir, "global")
+	localConfig := filepath.Join(tmpDir, "local")
+
+	globalContent := `
+[run_profile.fast]
+claude_command = claude-p
+claude_args = --dangerously-skip-permissions
+task_model = haiku
+review_model = haiku
+`
+	require.NoError(t, os.WriteFile(globalConfig, []byte(globalContent), 0o600))
+
+	localContent := `
+[run_profile.fast]
+review_model = sonnet
+`
+	require.NoError(t, os.WriteFile(localConfig, []byte(localContent), 0o600))
+
+	loader := newValuesLoader(defaultsFS)
+	values, err := loader.Load(localConfig, globalConfig)
+	require.NoError(t, err)
+
+	require.Len(t, values.RunProfileDefinitions, 1)
+	profile := values.RunProfileDefinitions[0]
+	assert.Equal(t, "claude-p", profile.ClaudeCommand)
+	assert.Equal(t, "--dangerously-skip-permissions", profile.ClaudeArgs)
+	assert.Equal(t, "haiku", profile.TaskModel)
+	assert.Equal(t, "sonnet", profile.ReviewModel)
+}
+
+func TestValuesLoader_Load_RunProfile_LocalEmptyFieldClearsGlobalSameName(t *testing.T) {
+	tmpDir := t.TempDir()
+	globalConfig := filepath.Join(tmpDir, "global")
+	localConfig := filepath.Join(tmpDir, "local")
+
+	globalContent := `
+[run_profile.fast]
+claude_args = --dangerously-skip-permissions
+task_model = haiku
+`
+	require.NoError(t, os.WriteFile(globalConfig, []byte(globalContent), 0o600))
+
+	localContent := `
+[run_profile.fast]
+claude_args =
+`
+	require.NoError(t, os.WriteFile(localConfig, []byte(localContent), 0o600))
+
+	loader := newValuesLoader(defaultsFS)
+	values, err := loader.Load(localConfig, globalConfig)
+	require.NoError(t, err)
+
+	require.Len(t, values.RunProfileDefinitions, 1)
+	profile := values.RunProfileDefinitions[0]
+	assert.Empty(t, profile.ClaudeArgs)
+	assert.True(t, profile.ClaudeArgsSet)
+	assert.Equal(t, "haiku", profile.TaskModel)
+}
+
 func TestValuesLoader_Load_RunProfile_LocalEmptyClearsGlobal(t *testing.T) {
 	tmpDir := t.TempDir()
 	globalConfig := filepath.Join(tmpDir, "global")
@@ -2737,10 +2842,11 @@ func TestValues_mergeFrom_RunProfile(t *testing.T) {
 	})
 
 	t.Run("src definition overrides dst definition with same name", func(t *testing.T) {
-		dst := Values{RunProfileDefinitions: []RunProfile{{Name: "fast", TaskModel: "haiku"}}}
+		dst := Values{RunProfileDefinitions: []RunProfile{{Name: "fast", ClaudeCommand: "claude-p", TaskModel: "haiku"}}}
 		src := Values{RunProfileDefinitions: []RunProfile{{Name: "fast", TaskModel: "sonnet"}}}
 		dst.mergeFrom(&src)
 		require.Len(t, dst.RunProfileDefinitions, 1)
+		assert.Equal(t, "claude-p", dst.RunProfileDefinitions[0].ClaudeCommand)
 		assert.Equal(t, "sonnet", dst.RunProfileDefinitions[0].TaskModel)
 	})
 }

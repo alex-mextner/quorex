@@ -18,7 +18,9 @@ type Values struct {
 	ClaudeCommand               string
 	ClaudeArgs                  string
 	TaskModel                   string   // model for task execution (e.g., "opus", "sonnet", "haiku")
+	TaskModelSet                bool     // tracks if task_model was explicitly set
 	ReviewModel                 string   // model for review phases (falls back to TaskModel if empty)
+	ReviewModelSet              bool     // tracks if review_model was explicitly set
 	ClaudeErrorPatterns         []string // patterns to detect in claude output (e.g., rate limit messages)
 	CodexEnabled                bool
 	CodexEnabledSet             bool // tracks if codex_enabled was explicitly set
@@ -38,6 +40,7 @@ type Values struct {
 	IdleTimeout                 time.Duration // kill session after no output for this duration
 	IdleTimeoutSet              bool          // tracks if idle_timeout was explicitly set
 	ExternalReviewTool          string        // "codex", "custom", or "none"
+	ExternalReviewToolSet       bool          // tracks if external_review_tool was explicitly set
 	ExternalReviewers           []ExternalReviewer
 	ExternalReviewerDefinitions []ExternalReviewer
 	ExternalReviewersSet        bool
@@ -195,9 +198,11 @@ func (vl *valuesLoader) parseValuesFromBytes(data []byte) (Values, error) {
 	}
 	if key, err := section.GetKey("task_model"); err == nil {
 		values.TaskModel = key.String()
+		values.TaskModelSet = true
 	}
 	if key, err := section.GetKey("review_model"); err == nil {
 		values.ReviewModel = key.String()
+		values.ReviewModelSet = true
 	}
 
 	// codex settings
@@ -236,6 +241,7 @@ func (vl *valuesLoader) parseValuesFromBytes(data []byte) (Values, error) {
 	// external review settings
 	if key, err := section.GetKey("external_review_tool"); err == nil {
 		values.ExternalReviewTool = key.String()
+		values.ExternalReviewToolSet = true
 	}
 	values.ExternalReviewerDefinitions = vl.parseExternalReviewerDefinitions(cfg)
 	values.ExternalReviewers, values.ExternalReviewersSet = vl.parseExternalReviewers(cfg, values.ExternalReviewerDefinitions)
@@ -458,18 +464,38 @@ func (vl *valuesLoader) parseIdleTimeout(section *ini.Section, values *Values) e
 
 // mergeFrom merges non-empty values from src into dst.
 func (dst *Values) mergeFrom(src *Values) {
+	dst.mergeProviderFrom(src)
+	dst.mergeExecutionFrom(src)
+	dst.mergeExtraFrom(src)
+	dst.mergeNotifyFrom(src)
+}
+
+// mergeProviderFrom merges provider and external-review settings from src into dst.
+// called from mergeFrom to manage cyclomatic complexity.
+func (dst *Values) mergeProviderFrom(src *Values) {
+	dst.mergeClaudeFrom(src)
+	dst.mergeCodexFrom(src)
+	dst.mergeExternalReviewFrom(src)
+}
+
+func (dst *Values) mergeClaudeFrom(src *Values) {
 	if src.ClaudeCommand != "" {
 		dst.ClaudeCommand = src.ClaudeCommand
 	}
 	if src.ClaudeArgs != "" {
 		dst.ClaudeArgs = src.ClaudeArgs
 	}
-	if src.TaskModel != "" {
+	if src.TaskModelSet || src.TaskModel != "" {
 		dst.TaskModel = src.TaskModel
+		dst.TaskModelSet = true
 	}
-	if src.ReviewModel != "" {
+	if src.ReviewModelSet || src.ReviewModel != "" {
 		dst.ReviewModel = src.ReviewModel
+		dst.ReviewModelSet = true
 	}
+}
+
+func (dst *Values) mergeCodexFrom(src *Values) {
 	if src.CodexEnabledSet {
 		dst.CodexEnabled = src.CodexEnabled
 		dst.CodexEnabledSet = true
@@ -494,8 +520,12 @@ func (dst *Values) mergeFrom(src *Values) {
 	if src.CodexSandbox != "" {
 		dst.CodexSandbox = src.CodexSandbox
 	}
-	if src.ExternalReviewTool != "" {
+}
+
+func (dst *Values) mergeExternalReviewFrom(src *Values) {
+	if src.ExternalReviewToolSet || src.ExternalReviewTool != "" {
 		dst.ExternalReviewTool = src.ExternalReviewTool
+		dst.ExternalReviewToolSet = true
 		if !src.ExternalReviewersSet {
 			dst.ExternalReviewers = nil
 			dst.ExternalReviewersSet = false
@@ -512,9 +542,6 @@ func (dst *Values) mergeFrom(src *Values) {
 	if src.CustomReviewScript != "" {
 		dst.CustomReviewScript = src.CustomReviewScript
 	}
-	dst.mergeExecutionFrom(src)
-	dst.mergeExtraFrom(src)
-	dst.mergeNotifyFrom(src)
 }
 
 // mergeExecutionFrom merges execution-related fields from src into dst.
@@ -862,7 +889,6 @@ func SelectExternalReviewers(names []string, configured []ExternalReviewer) []Ex
 	return selected
 }
 
-//nolint:dupl // same merge-by-name pattern as mergeRunProfileDefinitions but for ExternalReviewer type
 func mergeExternalReviewerDefinitions(dst, src []ExternalReviewer) []ExternalReviewer {
 	merged := make([]ExternalReviewer, 0, len(dst)+len(src))
 	indexByName := make(map[string]int, len(dst)+len(src))
@@ -922,7 +948,6 @@ func (vl *valuesLoader) parseRunProfileDefinitions(cfg *ini.File) []RunProfile {
 	return profiles
 }
 
-//nolint:dupl // same merge-by-name pattern as mergeExternalReviewerDefinitions but for RunProfile type
 func mergeRunProfileDefinitions(dst, src []RunProfile) []RunProfile {
 	merged := make([]RunProfile, 0, len(dst)+len(src))
 	indexByName := make(map[string]int, len(dst)+len(src))
@@ -932,13 +957,45 @@ func mergeRunProfileDefinitions(dst, src []RunProfile) []RunProfile {
 	}
 	for _, p := range src {
 		if idx, ok := indexByName[p.Name]; ok {
-			merged[idx] = p
+			merged[idx] = mergeRunProfileDefinition(merged[idx], p)
 			continue
 		}
 		indexByName[p.Name] = len(merged)
 		merged = append(merged, p)
 	}
 	return merged
+}
+
+func mergeRunProfileDefinition(dst, src RunProfile) RunProfile {
+	if src.ClaudeCommandSet || src.ClaudeCommand != "" {
+		dst.ClaudeCommand = src.ClaudeCommand
+		dst.ClaudeCommandSet = true
+	}
+	if src.ClaudeArgsSet || src.ClaudeArgs != "" {
+		dst.ClaudeArgs = src.ClaudeArgs
+		dst.ClaudeArgsSet = true
+	}
+	if src.TaskModelSet || src.TaskModel != "" {
+		dst.TaskModel = src.TaskModel
+		dst.TaskModelSet = true
+	}
+	if src.ReviewModelSet || src.ReviewModel != "" {
+		dst.ReviewModel = src.ReviewModel
+		dst.ReviewModelSet = true
+	}
+	if src.ExternalReviewersSet || src.ExternalReviewers != "" {
+		dst.ExternalReviewers = src.ExternalReviewers
+		dst.ExternalReviewersSet = true
+	}
+	if src.ExternalReviewToolSet || src.ExternalReviewTool != "" {
+		dst.ExternalReviewTool = src.ExternalReviewTool
+		dst.ExternalReviewToolSet = true
+	}
+	if src.CustomReviewScriptSet || src.CustomReviewScript != "" {
+		dst.CustomReviewScript = src.CustomReviewScript
+		dst.CustomReviewScriptSet = true
+	}
+	return dst
 }
 
 func externalReviewerNames(reviewers []ExternalReviewer) []string {

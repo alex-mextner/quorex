@@ -680,6 +680,24 @@ func TestProviderOverrideFlags(t *testing.T) {
 		assert.True(t, cfg.ClaudeArgsSet)
 	})
 
+	t.Run("empty_task_model_clears_config", func(t *testing.T) {
+		cfg := &config.Config{TaskModel: "opus"}
+		o := parseTestOpts(t, "--task-model=")
+
+		applyCLIOverrides(o, cfg)
+
+		assert.Empty(t, cfg.TaskModel)
+	})
+
+	t.Run("empty_review_model_clears_config", func(t *testing.T) {
+		cfg := &config.Config{ReviewModel: "sonnet"}
+		o := parseTestOpts(t, "--review-model=")
+
+		applyCLIOverrides(o, cfg)
+
+		assert.Empty(t, cfg.ReviewModel)
+	})
+
 	t.Run("external_review_tool_overrides_config", func(t *testing.T) {
 		cfg := &config.Config{ExternalReviewTool: "codex"}
 		o := parseTestOpts(t, "--external-review-tool", "custom")
@@ -2466,10 +2484,7 @@ func TestRunProfileFlags(t *testing.T) {
 			},
 		}
 		// simulate what run() does: apply config.RunProfile before CLI overrides
-		effectiveProfile := ""
-		if effectiveProfile == "" {
-			effectiveProfile = cfg.RunProfile
-		}
+		effectiveProfile := resolveRunProfile(opts{}, cfg)
 		require.NoError(t, cfg.ApplyProfile(effectiveProfile))
 
 		assert.Equal(t, "claude-p", cfg.ClaudeCommand)
@@ -2487,15 +2502,29 @@ func TestRunProfileFlags(t *testing.T) {
 		o := parseTestOpts(t, "--run-profile=fast")
 
 		// CLI --run-profile takes precedence over config run_profile
-		effectiveProfile := o.RunProfile
-		if effectiveProfile == "" {
-			effectiveProfile = cfg.RunProfile
-		}
+		effectiveProfile := resolveRunProfile(o, cfg)
 		require.NoError(t, cfg.ApplyProfile(effectiveProfile))
 
 		assert.Equal(t, "fast", effectiveProfile)
 		assert.Equal(t, "claude-p", cfg.ClaudeCommand)
 		assert.Equal(t, "opus", cfg.TaskModel)
+	})
+
+	t.Run("empty_cli_run_profile_clears_config_run_profile", func(t *testing.T) {
+		cfg := &config.Config{
+			RunProfile: "slow",
+			RunProfileDefinitions: []config.RunProfile{
+				{Name: "slow", ClaudeCommand: "claude", TaskModel: "haiku"},
+			},
+		}
+		o := parseTestOpts(t, "--run-profile=")
+
+		effectiveProfile := resolveRunProfile(o, cfg)
+
+		assert.Empty(t, effectiveProfile)
+		assert.Equal(t, "slow", cfg.RunProfile)
+		assert.Empty(t, cfg.ClaudeCommand)
+		assert.Empty(t, cfg.TaskModel)
 	})
 
 	t.Run("missing_profile_returns_error", func(t *testing.T) {

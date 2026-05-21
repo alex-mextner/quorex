@@ -1530,6 +1530,34 @@ func TestRunProfile_ApplyProfile(t *testing.T) {
 		assert.Equal(t, "/path/review.sh", cfg.CustomReviewScript)
 	})
 
+	t.Run("empty_external_reviewers_disables_review", func(t *testing.T) {
+		cfg := &Config{
+			ExternalReviewTool: "codex",
+			RunProfileDefinitions: []RunProfile{
+				{Name: "no-review", ExternalReviewersSet: true},
+			},
+		}
+
+		require.NoError(t, cfg.ApplyProfile("no-review"))
+
+		assert.Equal(t, "none", cfg.ExternalReviewTool)
+		assert.Empty(t, cfg.ExternalReviewers)
+	})
+
+	t.Run("empty_external_review_tool_disables_review", func(t *testing.T) {
+		cfg := &Config{
+			ExternalReviewers: []ExternalReviewer{{Name: "codex", Driver: "codex"}},
+			RunProfileDefinitions: []RunProfile{
+				{Name: "no-review", ExternalReviewToolSet: true},
+			},
+		}
+
+		require.NoError(t, cfg.ApplyProfile("no-review"))
+
+		assert.Equal(t, "none", cfg.ExternalReviewTool)
+		assert.Empty(t, cfg.ExternalReviewers)
+	})
+
 	t.Run("profile_does_not_override_empty_fields", func(t *testing.T) {
 		cfg := &Config{
 			ClaudeCommand: "original-claude",

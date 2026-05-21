@@ -118,7 +118,9 @@ external_review_tool = codex
 # supported fields: claude_command, claude_args, task_model, review_model,
 #   external_reviewers, external_review_tool, custom_review_script.
 # any field left out of the profile section falls back to the main config value.
+# same-name profile sections in local config merge per field with global profiles.
 # a field present with an empty value clears the lower-precedence value for that profile.
+# use external_review_tool = none or empty external_reviewers = to disable external review.
 #
 # example — claude-p adapter pointing at Equality-Machine/claude-p:
 #

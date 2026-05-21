@@ -851,11 +851,11 @@ Provider-related CLI flags (`--claude-command`, `--claude-args`, `--external-rev
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `run_profile` | Name of the active run profile. Selects a `[run_profile.<name>]` section that sets `claude_command`, `claude_args`, `task_model`, `review_model`, `external_reviewers`, `external_review_tool`, `custom_review_script` as one unit. Applied after config files, before CLI flags. Override with `--run-profile` | empty |
+| `run_profile` | Name of the active run profile. Selects a `[run_profile.<name>]` section that sets `claude_command`, `claude_args`, `task_model`, `review_model`, `external_reviewers`, `external_review_tool`, `custom_review_script` as one unit. Applied after config files, before CLI flags. Override with `--run-profile`; use `--run-profile=` for one run without the configured profile | empty |
 | `claude_command` | Claude CLI command | `claude` |
 | `claude_args` | Claude CLI arguments | `--dangerously-skip-permissions --output-format stream-json --verbose` |
-| `task_model` | Model for task execution as `model[:effort]` (e.g., `opus`, `opus:high`, `:medium`). Effort: `low`, `medium`, `high`, `xhigh`, `max`. Appended as `--model <m>` and/or `--effort <e>` to `claude_command`; custom wrappers may ignore or implement the flags | empty |
-| `review_model` | Model for review phases as `model[:effort]`. Falls back to `task_model` if empty. Same syntax and wrapper behavior as `task_model` | empty |
+| `task_model` | Model for task execution as `model[:effort]` (e.g., `opus`, `opus:high`, `:medium`). Effort: `low`, `medium`, `high`, `xhigh`, `max`. Appended as `--model <m>` and/or `--effort <e>` to `claude_command`; custom wrappers may ignore or implement the flags. Empty local config or `--task-model=` clears a lower-precedence value | empty |
+| `review_model` | Model for review phases as `model[:effort]`. Falls back to `task_model` if empty. Same syntax and wrapper behavior as `task_model`. Empty local config or `--review-model=` clears a lower-precedence value | empty |
 | `codex_enabled` | Enable codex review phase | `true` |
 | `codex_command` | Codex CLI command | `codex` |
 | `codex_model` | Codex model ID | `gpt-5.4` |
@@ -1050,7 +1050,7 @@ Or select one per invocation without touching config:
 ralphex --run-profile=claude-p-sonnet docs/plans/feature.md
 ```
 
-Any field omitted from the profile section falls back to the main config value, so a profile can override only the fields it cares about. A field present with an empty value intentionally clears the lower-precedence value, e.g. `claude_args =` suppresses default Claude arguments for that profile.
+Any field omitted from the profile section falls back to the main config value, so a profile can override only the fields it cares about. A local profile section with the same name merges per field with the lower-precedence profile. A field present with an empty value intentionally clears the lower-precedence value, e.g. `claude_args =` suppresses default Claude arguments for that profile; use `external_review_tool = none` or an empty `external_reviewers =` to disable external review in a profile.
 
 **claude-p adapter example.** [`Equality-Machine/claude-p`](https://github.com/Equality-Machine/claude-p) is a `-p` compatibility adapter for Claude Code. It does not require a running proxy or `ANTHROPIC_BASE_URL`, making it safe to use directly:
 

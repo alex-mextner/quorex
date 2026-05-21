@@ -445,10 +445,18 @@ func (c *Config) ApplyProfile(profileName string) error {
 	// external_reviewers and external_review_tool are mutually exclusive
 	if profile.ExternalReviewersSet || profile.ExternalReviewers != "" {
 		names := ParseCommaSeparated(profile.ExternalReviewers)
-		c.ExternalReviewers = SelectExternalReviewers(names, c.ExternalReviewerDefinitions)
-		c.ExternalReviewTool = ""
+		if len(names) == 0 {
+			c.ExternalReviewers = nil
+			c.ExternalReviewTool = "none"
+		} else {
+			c.ExternalReviewers = SelectExternalReviewers(names, c.ExternalReviewerDefinitions)
+			c.ExternalReviewTool = ""
+		}
 	} else if profile.ExternalReviewToolSet || profile.ExternalReviewTool != "" {
 		c.ExternalReviewTool = profile.ExternalReviewTool
+		if c.ExternalReviewTool == "" {
+			c.ExternalReviewTool = "none"
+		}
 		c.ExternalReviewers = nil
 	}
 	return nil
