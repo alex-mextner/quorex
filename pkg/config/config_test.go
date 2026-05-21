@@ -1530,6 +1530,42 @@ func TestRunProfile_ApplyProfile(t *testing.T) {
 		assert.Equal(t, "/path/review.sh", cfg.CustomReviewScript)
 	})
 
+	t.Run("external_reviewers_win_when_profile_sets_both_selectors", func(t *testing.T) {
+		cfg := &Config{
+			ExternalReviewTool: "codex",
+			ExternalReviewerDefinitions: []ExternalReviewer{
+				{Name: "deepseek", Driver: "script", Script: "/path/deepseek.sh"},
+			},
+			RunProfileDefinitions: []RunProfile{
+				{
+					Name:                  "multi",
+					ExternalReviewers:     "deepseek",
+					ExternalReviewersSet:  true,
+					ExternalReviewTool:    "custom",
+					ExternalReviewToolSet: true,
+				},
+			},
+		}
+
+		require.NoError(t, cfg.ApplyProfile("multi"))
+
+		assert.Empty(t, cfg.ExternalReviewTool)
+		assert.Equal(t, []ExternalReviewer{{Name: "deepseek", Driver: "script", Script: "/path/deepseek.sh"}}, cfg.ExternalReviewers)
+	})
+
+	t.Run("invalid_external_review_tool_returns_error", func(t *testing.T) {
+		cfg := &Config{
+			RunProfileDefinitions: []RunProfile{
+				{Name: "bad", ExternalReviewTool: "codexx", ExternalReviewToolSet: true},
+			},
+		}
+
+		err := cfg.ApplyProfile("bad")
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid external_review_tool")
+	})
+
 	t.Run("empty_external_reviewers_disables_review", func(t *testing.T) {
 		cfg := &Config{
 			ExternalReviewTool: "codex",

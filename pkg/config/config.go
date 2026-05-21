@@ -150,6 +150,12 @@ type ExternalReviewer struct {
 	Script string `json:"script"` // path for script driver
 }
 
+const (
+	ExternalReviewToolCodex  = "codex"
+	ExternalReviewToolCustom = "custom"
+	ExternalReviewToolNone   = "none"
+)
+
 // RunProfile holds execution settings that can be selected as a named unit.
 // A profile overrides the matching config fields when selected via run_profile
 // or --run-profile. Direct CLI flags still take precedence over profile values.
@@ -447,19 +453,32 @@ func (c *Config) ApplyProfile(profileName string) error {
 		names := ParseCommaSeparated(profile.ExternalReviewers)
 		if len(names) == 0 {
 			c.ExternalReviewers = nil
-			c.ExternalReviewTool = "none"
+			c.ExternalReviewTool = ExternalReviewToolNone
 		} else {
 			c.ExternalReviewers = SelectExternalReviewers(names, c.ExternalReviewerDefinitions)
 			c.ExternalReviewTool = ""
 		}
 	} else if profile.ExternalReviewToolSet || profile.ExternalReviewTool != "" {
-		c.ExternalReviewTool = profile.ExternalReviewTool
-		if c.ExternalReviewTool == "" {
-			c.ExternalReviewTool = "none"
+		tool, toolErr := normalizeExternalReviewTool(profile.ExternalReviewTool)
+		if toolErr != nil {
+			return toolErr
 		}
+		c.ExternalReviewTool = tool
 		c.ExternalReviewers = nil
 	}
 	return nil
+}
+
+func normalizeExternalReviewTool(tool string) (string, error) {
+	if tool == "" {
+		return ExternalReviewToolNone, nil
+	}
+	switch tool {
+	case ExternalReviewToolCodex, ExternalReviewToolCustom, ExternalReviewToolNone:
+		return tool, nil
+	default:
+		return "", fmt.Errorf("invalid external_review_tool %q in run profile; expected codex, custom, or none", tool)
+	}
 }
 
 // DefaultConfigDir returns the default configuration directory path.

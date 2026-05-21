@@ -612,9 +612,9 @@ ralphex --serve --port=3000 docs/plans/feature.md
 | `-t, --tasks-only` | Run only task phase, skip all reviews | false |
 | `-b, --base-ref` | Override default branch for review diffs (branch name or commit hash) | auto-detect |
 | `--skip-finalize` | Skip finalize step even if enabled in config | false |
-| `--run-profile` | Activate a named run profile defined in `[run_profile.<name>]` config section. Profile settings are applied after config files but before direct CLI flags, so other flags still override the profile | config/default |
-| `--task-model` | Model for task execution as `model[:effort]` (e.g., `opus`, `opus:high`, `:medium`). Effort values: `low`, `medium`, `high`, `xhigh`, `max`. Appended as `--model <m>` and/or `--effort <e>` to `claude_command`; custom wrappers may ignore or implement the flags | empty |
-| `--review-model` | Model for review phases as `model[:effort]` (falls back to `--task-model`). Same syntax and wrapper behavior as `--task-model` | empty |
+| `--run-profile` | Activate a named run profile defined in `[run_profile.<name>]` config section. Profile settings are applied after config files but before direct CLI flags, so other flags still override the profile. Use `--run-profile=` to disable a configured profile for one run | config/default |
+| `--task-model` | Model for task execution as `model[:effort]` (e.g., `opus`, `opus:high`, `:medium`). Effort values: `low`, `medium`, `high`, `xhigh`, `max`. Appended as `--model <m>` and/or `--effort <e>` to `claude_command`; custom wrappers may ignore or implement the flags. Use `--task-model=` to clear a configured model for one run | empty |
+| `--review-model` | Model for review phases as `model[:effort]` (falls back to `--task-model`). Same syntax and wrapper behavior as `--task-model`. Use `--review-model=` to clear a configured model for one run | empty |
 | `--claude-command` | Override the Claude-compatible command for this run | config/default |
 | `--claude-args` | Override Claude-compatible command arguments for this run. Use `--claude-args=` to clear configured/default args | config/default |
 | `--external-review-tool` | Override external review tool for this run (`codex`, `custom`, or `none`) | config/default |
@@ -1022,7 +1022,7 @@ When running ralphex in Docker, your script must be accessible inside the contai
 
 A run profile bundles several execution settings — `claude_command`, `claude_args`, `task_model`, `review_model`, `external_reviewers`, `external_review_tool`, `custom_review_script` — under a single name so you can switch the full setup in one flag instead of overriding each field individually.
 
-**Precedence:** `CLI direct flags > CLI --run-profile > config run_profile > local config > global config > embedded defaults`
+**Precedence:** `CLI direct flags > CLI --run-profile > merged config run_profile > local config > global config > embedded defaults`
 
 This means `--run-profile=my-profile --claude-command=claude` first applies the profile, then overrides only `claude_command` from the direct flag.
 
@@ -1050,7 +1050,7 @@ Or select one per invocation without touching config:
 ralphex --run-profile=claude-p-sonnet docs/plans/feature.md
 ```
 
-Any field omitted from the profile section falls back to the main config value, so a profile can override only the fields it cares about. A local profile section with the same name merges per field with the lower-precedence profile. A field present with an empty value intentionally clears the lower-precedence value, e.g. `claude_args =` suppresses default Claude arguments for that profile; use `external_review_tool = none` or an empty `external_reviewers =` to disable external review in a profile.
+Any field omitted from the profile section falls back to the main config value, so a profile can override only the fields it cares about. A local profile section with the same name merges per field with the lower-precedence profile. A field present with an empty value intentionally clears the lower-precedence value, e.g. `claude_args =` suppresses default Claude arguments for that profile; use `external_review_tool = none` or an empty `external_reviewers =` to disable external review in a profile. If a profile sets both `external_reviewers` and `external_review_tool`, named reviewers win.
 
 **claude-p adapter example.** [`Equality-Machine/claude-p`](https://github.com/Equality-Machine/claude-p) is a `-p` compatibility adapter for Claude Code. It does not require a running proxy or `ANTHROPIC_BASE_URL`, making it safe to use directly:
 

@@ -66,7 +66,7 @@ driver = script
 script = ~/.config/ralphex/scripts/opencode-deepseek-review.sh
 ```
 
-Each reviewer name is used in logs and in the combined evaluation prompt. A single `codex` reviewer keeps the Codex evaluation prompt; multiple parallel reviewers are evaluated together with `custom_eval.txt`. The `script` driver receives the prompt file path as its single argument, so it can wrap OpenCode with DeepSeek Reasoner or any other review provider. If any configured reviewer fails, the external review iteration fails instead of evaluating an incomplete reviewer set.
+Each reviewer name is used in logs and in the combined evaluation prompt. A single `codex` reviewer keeps the Codex evaluation prompt from `~/.config/ralphex/prompts/codex.txt`; multiple parallel reviewers are evaluated together with `custom_eval.txt`. The `script` driver receives the prompt file path as its single argument, so it can wrap OpenCode with DeepSeek Reasoner or any other review provider. If any configured reviewer fails, the external review iteration fails instead of evaluating an incomplete reviewer set.
 
 ## Codex wrapper (included example)
 
