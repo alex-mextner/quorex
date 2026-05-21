@@ -1445,3 +1445,131 @@ func TestLocalConfig_LocalOverridesIdleTimeout(t *testing.T) {
 	assert.Equal(t, 5*time.Minute, cfg.IdleTimeout)
 	assert.True(t, cfg.IdleTimeoutSet)
 }
+
+func TestRunProfile_ApplyProfile(t *testing.T) {
+	t.Run("applies_scalar_fields", func(t *testing.T) {
+		cfg := &Config{
+			ClaudeCommand: "claude",
+			ClaudeArgs:    "--default-args",
+			TaskModel:     "sonnet",
+			ReviewModel:   "haiku",
+			RunProfileDefinitions: []RunProfile{
+				{
+					Name:          "fast",
+					ClaudeCommand: "claude-p",
+					ClaudeArgs:    "--stream-json",
+					TaskModel:     "opus",
+					ReviewModel:   "sonnet",
+				},
+			},
+		}
+
+		require.NoError(t, cfg.ApplyProfile("fast"))
+
+		assert.Equal(t, "claude-p", cfg.ClaudeCommand)
+		assert.Equal(t, "--stream-json", cfg.ClaudeArgs)
+		assert.True(t, cfg.ClaudeArgsSet, "ClaudeArgsSet must be set when profile sets claude_args")
+		assert.Equal(t, "opus", cfg.TaskModel)
+		assert.Equal(t, "sonnet", cfg.ReviewModel)
+	})
+
+	t.Run("missing_profile_returns_error", func(t *testing.T) {
+		cfg := &Config{
+			RunProfileDefinitions: []RunProfile{
+				{Name: "existing"},
+			},
+		}
+
+		err := cfg.ApplyProfile("nonexistent")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "nonexistent")
+	})
+
+	t.Run("no_profiles_defined_returns_error", func(t *testing.T) {
+		cfg := &Config{}
+
+		err := cfg.ApplyProfile("any")
+		require.Error(t, err)
+	})
+
+	t.Run("external_reviewers_resolves_and_clears_tool", func(t *testing.T) {
+		cfg := &Config{
+			ExternalReviewTool: "codex",
+			ExternalReviewerDefinitions: []ExternalReviewer{
+				{Name: "deepseek", Driver: "script", Script: "/path/deepseek.sh"},
+				{Name: "codex", Driver: "codex"},
+			},
+			RunProfileDefinitions: []RunProfile{
+				{Name: "multi", ExternalReviewers: "deepseek,codex"},
+			},
+		}
+
+		require.NoError(t, cfg.ApplyProfile("multi"))
+
+		assert.Empty(t, cfg.ExternalReviewTool)
+		assert.Equal(t, []ExternalReviewer{
+			{Name: "deepseek", Driver: "script", Script: "/path/deepseek.sh"},
+			{Name: "codex", Driver: "codex"},
+		}, cfg.ExternalReviewers)
+	})
+
+	t.Run("external_review_tool_clears_reviewers", func(t *testing.T) {
+		cfg := &Config{
+			ExternalReviewers: []ExternalReviewer{
+				{Name: "codex", Driver: "codex"},
+			},
+			RunProfileDefinitions: []RunProfile{
+				{Name: "custom-only", ExternalReviewTool: "custom", CustomReviewScript: "/path/review.sh"},
+			},
+		}
+
+		require.NoError(t, cfg.ApplyProfile("custom-only"))
+
+		assert.Equal(t, "custom", cfg.ExternalReviewTool)
+		assert.Empty(t, cfg.ExternalReviewers)
+		assert.Equal(t, "/path/review.sh", cfg.CustomReviewScript)
+	})
+
+	t.Run("profile_does_not_override_empty_fields", func(t *testing.T) {
+		cfg := &Config{
+			ClaudeCommand: "original-claude",
+			TaskModel:     "sonnet",
+			RunProfileDefinitions: []RunProfile{
+				{Name: "minimal", ReviewModel: "haiku"},
+			},
+		}
+
+		require.NoError(t, cfg.ApplyProfile("minimal"))
+
+		// profile had no ClaudeCommand or TaskModel, so originals should survive
+		assert.Equal(t, "original-claude", cfg.ClaudeCommand)
+		assert.Equal(t, "sonnet", cfg.TaskModel)
+		assert.Equal(t, "haiku", cfg.ReviewModel)
+	})
+
+	t.Run("run_profile_loaded_from_config", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		globalDir := filepath.Join(tmpDir, "global")
+		require.NoError(t, os.MkdirAll(globalDir, 0o700))
+		require.NoError(t, os.MkdirAll(filepath.Join(globalDir, "prompts"), 0o700))
+		require.NoError(t, os.MkdirAll(filepath.Join(globalDir, "agents"), 0o700))
+
+		configContent := `
+run_profile = fast
+
+[run_profile.fast]
+claude_command = claude-p
+task_model     = opus
+`
+		require.NoError(t, os.WriteFile(filepath.Join(globalDir, "config"), []byte(configContent), 0o600))
+
+		cfg, err := loadWithLocal(globalDir, "")
+		require.NoError(t, err)
+
+		assert.Equal(t, "fast", cfg.RunProfile)
+		require.Len(t, cfg.RunProfileDefinitions, 1)
+		assert.Equal(t, "fast", cfg.RunProfileDefinitions[0].Name)
+		assert.Equal(t, "claude-p", cfg.RunProfileDefinitions[0].ClaudeCommand)
+		assert.Equal(t, "opus", cfg.RunProfileDefinitions[0].TaskModel)
+	})
+}

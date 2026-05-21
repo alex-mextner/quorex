@@ -126,10 +126,10 @@ Do not implement this section in the current PR.
 
 ### Task 4: Verification
 
-- [ ] Run `make fmt`.
-- [ ] Run `go test ./...`.
-- [ ] Run `make build`.
-- [ ] Run `make lint`.
-- [ ] Run `make test`.
-- [ ] Confirm `git diff --check` is clean.
-- [ ] Summarize the exact API and examples for the PR body.
+- [x] Run `make fmt`.
+- [x] Run `go test ./...`.
+- [x] Run `make build`.
+- [x] Run `make lint`.
+- [x] Run `make test`.
+- [x] Confirm `git diff --check` is clean.
+- [x] Summarize the exact API and examples for the PR body.

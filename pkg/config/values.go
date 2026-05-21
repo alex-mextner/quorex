@@ -64,6 +64,10 @@ type Values struct {
 	DefaultBranch               string   // override auto-detected default branch
 	WatchDirs                   []string // directories to watch for progress files
 
+	// run profile settings
+	RunProfile            string       // selected profile name (run_profile key)
+	RunProfileDefinitions []RunProfile // all [run_profile.<name>] sections
+
 	// notification settings
 	NotifyChannels        []string // channels to use: telegram, email, webhook, slack, custom
 	NotifyChannelsSet     bool     // tracks if notify_channels was explicitly set (allows empty to disable)
@@ -378,6 +382,12 @@ func (vl *valuesLoader) parseValuesFromBytes(data []byte) (Values, error) {
 		return Values{}, err
 	}
 
+	// run profile settings
+	if key, err := section.GetKey("run_profile"); err == nil {
+		values.RunProfile = strings.TrimSpace(key.String())
+	}
+	values.RunProfileDefinitions = vl.parseRunProfileDefinitions(cfg)
+
 	return values, nil
 }
 
@@ -585,6 +595,12 @@ func (dst *Values) mergeExtraFrom(src *Values) {
 	if src.IdleTimeoutSet {
 		dst.IdleTimeout = src.IdleTimeout
 		dst.IdleTimeoutSet = true
+	}
+	if src.RunProfile != "" {
+		dst.RunProfile = src.RunProfile
+	}
+	if len(src.RunProfileDefinitions) > 0 {
+		dst.RunProfileDefinitions = mergeRunProfileDefinitions(dst.RunProfileDefinitions, src.RunProfileDefinitions)
 	}
 }
 
@@ -843,6 +859,7 @@ func SelectExternalReviewers(names []string, configured []ExternalReviewer) []Ex
 	return selected
 }
 
+//nolint:dupl // same merge-by-name pattern as mergeRunProfileDefinitions but for ExternalReviewer type
 func mergeExternalReviewerDefinitions(dst, src []ExternalReviewer) []ExternalReviewer {
 	merged := make([]ExternalReviewer, 0, len(dst)+len(src))
 	indexByName := make(map[string]int, len(dst)+len(src))
@@ -857,6 +874,59 @@ func mergeExternalReviewerDefinitions(dst, src []ExternalReviewer) []ExternalRev
 		}
 		indexByName[reviewer.Name] = len(merged)
 		merged = append(merged, reviewer)
+	}
+	return merged
+}
+
+func (vl *valuesLoader) parseRunProfileDefinitions(cfg *ini.File) []RunProfile {
+	var profiles []RunProfile
+	for _, section := range cfg.Sections() {
+		name, ok := strings.CutPrefix(section.Name(), "run_profile.")
+		if !ok || name == "" {
+			continue
+		}
+		profile := RunProfile{Name: name}
+		if key, err := section.GetKey("claude_command"); err == nil {
+			profile.ClaudeCommand = strings.TrimSpace(key.String())
+		}
+		if key, err := section.GetKey("claude_args"); err == nil {
+			profile.ClaudeArgs = key.String()
+		}
+		if key, err := section.GetKey("task_model"); err == nil {
+			profile.TaskModel = strings.TrimSpace(key.String())
+		}
+		if key, err := section.GetKey("review_model"); err == nil {
+			profile.ReviewModel = strings.TrimSpace(key.String())
+		}
+		if key, err := section.GetKey("external_reviewers"); err == nil {
+			profile.ExternalReviewers = strings.TrimSpace(key.String())
+		}
+		if key, err := section.GetKey("external_review_tool"); err == nil {
+			profile.ExternalReviewTool = strings.TrimSpace(key.String())
+		}
+		if key, err := section.GetKey("custom_review_script"); err == nil {
+			profile.CustomReviewScript = expandTilde(strings.TrimSpace(key.String()))
+		}
+		profiles = append(profiles, profile)
+	}
+	return profiles
+}
+
+//nolint:dupl // same merge-by-name pattern as mergeExternalReviewerDefinitions but for RunProfile type
+func mergeRunProfileDefinitions(dst, src []RunProfile) []RunProfile {
+	merged := make([]RunProfile, 0, len(dst)+len(src))
+	indexByName := make(map[string]int, len(dst)+len(src))
+	for _, p := range dst {
+		indexByName[p.Name] = len(merged)
+		merged = append(merged, p)
+	}
+	for _, p := range src {
+		if idx, ok := indexByName[p.Name]; ok {
+			merged[idx] = p
+			continue
+		}
+		indexByName[p.Name] = len(merged)
+		merged = append(merged, p)
 	}
 	return merged
 }

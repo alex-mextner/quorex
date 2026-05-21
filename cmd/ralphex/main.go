@@ -66,6 +66,8 @@ type opts struct {
 	DumpDefaults            string        `long:"dump-defaults" description:"extract raw embedded defaults to specified directory"`
 	ConfigDir               string        `long:"config-dir" env:"RALPHEX_CONFIG_DIR" description:"custom config directory"`
 
+	RunProfile string `long:"run-profile" description:"select a named run profile from config"`
+
 	PlanFile string `positional-arg-name:"plan-file" description:"path to plan file (optional, uses fzf if omitted)"`
 
 	// set by markFlagsSet after parsing; true when the flag was explicitly provided on the CLI
@@ -73,6 +75,7 @@ type opts struct {
 	sessionTimeoutSet bool
 	idleTimeoutSet    bool
 
+	runProfileSet         bool
 	claudeCommandSet      bool
 	claudeArgsSet         bool
 	externalReviewToolSet bool
@@ -89,6 +92,7 @@ func (o *opts) markFlagsSet(parser *flags.Parser) {
 	o.waitSet = isFlagSet(parser, "wait")
 	o.sessionTimeoutSet = isFlagSet(parser, "session-timeout")
 	o.idleTimeoutSet = isFlagSet(parser, "idle-timeout")
+	o.runProfileSet = isFlagSet(parser, "run-profile")
 	o.claudeCommandSet = isFlagSet(parser, "claude-command")
 	o.claudeArgsSet = isFlagSet(parser, "claude-args")
 	o.externalReviewToolSet = isFlagSet(parser, "external-review-tool")
@@ -252,6 +256,18 @@ func run(ctx context.Context, o opts) error {
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
+
+	// apply run profile: CLI --run-profile takes precedence over config run_profile
+	effectiveProfile := o.RunProfile
+	if effectiveProfile == "" {
+		effectiveProfile = cfg.RunProfile
+	}
+	if effectiveProfile != "" {
+		if profileErr := cfg.ApplyProfile(effectiveProfile); profileErr != nil {
+			return fmt.Errorf("apply run profile: %w", profileErr)
+		}
+	}
+
 	applyCLIOverrides(o, cfg)
 
 	// create colors from config (all colors guaranteed populated via fallback)

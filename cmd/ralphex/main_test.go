@@ -2457,6 +2457,90 @@ func TestMakePauseHandler_EOFAborts(t *testing.T) {
 	assert.False(t, result, "handler should return false on EOF (stdin closed = abort)")
 }
 
+func TestRunProfileFlags(t *testing.T) {
+	t.Run("config_selected_profile_applied", func(t *testing.T) {
+		cfg := &config.Config{
+			RunProfile: "fast",
+			RunProfileDefinitions: []config.RunProfile{
+				{Name: "fast", ClaudeCommand: "claude-p", TaskModel: "opus"},
+			},
+		}
+		// simulate what run() does: apply config.RunProfile before CLI overrides
+		effectiveProfile := ""
+		if effectiveProfile == "" {
+			effectiveProfile = cfg.RunProfile
+		}
+		require.NoError(t, cfg.ApplyProfile(effectiveProfile))
+
+		assert.Equal(t, "claude-p", cfg.ClaudeCommand)
+		assert.Equal(t, "opus", cfg.TaskModel)
+	})
+
+	t.Run("cli_run_profile_overrides_config_run_profile", func(t *testing.T) {
+		cfg := &config.Config{
+			RunProfile: "slow",
+			RunProfileDefinitions: []config.RunProfile{
+				{Name: "slow", ClaudeCommand: "claude", TaskModel: "haiku"},
+				{Name: "fast", ClaudeCommand: "claude-p", TaskModel: "opus"},
+			},
+		}
+		o := parseTestOpts(t, "--run-profile=fast")
+
+		// CLI --run-profile takes precedence over config run_profile
+		effectiveProfile := o.RunProfile
+		if effectiveProfile == "" {
+			effectiveProfile = cfg.RunProfile
+		}
+		require.NoError(t, cfg.ApplyProfile(effectiveProfile))
+
+		assert.Equal(t, "fast", effectiveProfile)
+		assert.Equal(t, "claude-p", cfg.ClaudeCommand)
+		assert.Equal(t, "opus", cfg.TaskModel)
+	})
+
+	t.Run("missing_profile_returns_error", func(t *testing.T) {
+		cfg := &config.Config{
+			RunProfileDefinitions: []config.RunProfile{
+				{Name: "existing", ClaudeCommand: "claude"},
+			},
+		}
+		err := cfg.ApplyProfile("nonexistent")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "nonexistent")
+	})
+
+	t.Run("direct_cli_flag_wins_after_profile", func(t *testing.T) {
+		cfg := &config.Config{
+			RunProfileDefinitions: []config.RunProfile{
+				{Name: "fast", ClaudeCommand: "claude-p", ClaudeArgs: "--stream-json"},
+			},
+		}
+		o := parseTestOpts(t, "--run-profile=fast", "--claude-command=direct-claude")
+
+		// apply profile first
+		require.NoError(t, cfg.ApplyProfile(o.RunProfile))
+		// then CLI overrides win
+		applyCLIOverrides(o, cfg)
+
+		// CLI --claude-command overrides profile value
+		assert.Equal(t, "direct-claude", cfg.ClaudeCommand)
+		// profile's claude_args survives (no CLI override for it)
+		assert.Equal(t, "--stream-json", cfg.ClaudeArgs)
+	})
+
+	t.Run("run_profile_flag_detected", func(t *testing.T) {
+		o := parseTestOpts(t, "--run-profile=fast")
+		assert.True(t, o.runProfileSet)
+		assert.Equal(t, "fast", o.RunProfile)
+	})
+
+	t.Run("run_profile_not_set_when_omitted", func(t *testing.T) {
+		o := parseTestOpts(t)
+		assert.False(t, o.runProfileSet)
+		assert.Empty(t, o.RunProfile)
+	})
+}
+
 // branchExists checks if a branch exists in the given git repository.
 func branchExists(t *testing.T, dir, branch string) bool {
 	t.Helper()
