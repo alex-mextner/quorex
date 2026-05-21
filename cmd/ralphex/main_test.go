@@ -2530,13 +2530,11 @@ func TestRunProfileFlags(t *testing.T) {
 
 	t.Run("run_profile_flag_detected", func(t *testing.T) {
 		o := parseTestOpts(t, "--run-profile=fast")
-		assert.True(t, o.runProfileSet)
 		assert.Equal(t, "fast", o.RunProfile)
 	})
 
 	t.Run("run_profile_not_set_when_omitted", func(t *testing.T) {
 		o := parseTestOpts(t)
-		assert.False(t, o.runProfileSet)
 		assert.Empty(t, o.RunProfile)
 	})
 }

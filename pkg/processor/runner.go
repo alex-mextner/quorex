@@ -931,7 +931,6 @@ func (r *Runner) scriptReviewerExecutor(reviewer config.ExternalReviewer) (*exec
 }
 
 type externalReviewRunResult struct {
-	index  int
 	config externalReviewConfig
 	result executor.Result
 }
@@ -1040,11 +1039,11 @@ func (r *Runner) runParallelExternalReviews(ctx context.Context, configs []exter
 	results := make([]externalReviewRunResult, len(configs))
 	var wg sync.WaitGroup
 	for i, cfg := range configs {
-		results[i] = externalReviewRunResult{index: i, config: cfg}
+		results[i] = externalReviewRunResult{config: cfg}
 		wg.Go(func() {
 			prompt := cfg.buildPrompt(isFirst, claudeResponse)
 			result := r.runExternalWithLimitRetry(ctx, cfg.runReview, prompt, cfg.name)
-			results[i] = externalReviewRunResult{index: i, config: cfg, result: result}
+			results[i] = externalReviewRunResult{config: cfg, result: result}
 		})
 	}
 	wg.Wait()

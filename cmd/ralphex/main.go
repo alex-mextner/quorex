@@ -75,7 +75,6 @@ type opts struct {
 	sessionTimeoutSet bool
 	idleTimeoutSet    bool
 
-	runProfileSet         bool
 	claudeCommandSet      bool
 	claudeArgsSet         bool
 	externalReviewToolSet bool
@@ -92,7 +91,6 @@ func (o *opts) markFlagsSet(parser *flags.Parser) {
 	o.waitSet = isFlagSet(parser, "wait")
 	o.sessionTimeoutSet = isFlagSet(parser, "session-timeout")
 	o.idleTimeoutSet = isFlagSet(parser, "idle-timeout")
-	o.runProfileSet = isFlagSet(parser, "run-profile")
 	o.claudeCommandSet = isFlagSet(parser, "claude-command")
 	o.claudeArgsSet = isFlagSet(parser, "claude-args")
 	o.externalReviewToolSet = isFlagSet(parser, "external-review-tool")
