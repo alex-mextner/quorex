@@ -983,13 +983,17 @@ func mergeRunProfileDefinition(dst, src RunProfile) RunProfile {
 		dst.ReviewModel = src.ReviewModel
 		dst.ReviewModelSet = true
 	}
-	if src.ExternalReviewersSet || src.ExternalReviewers != "" {
-		dst.ExternalReviewers = src.ExternalReviewers
-		dst.ExternalReviewersSet = true
-	}
 	if src.ExternalReviewToolSet || src.ExternalReviewTool != "" {
 		dst.ExternalReviewTool = src.ExternalReviewTool
 		dst.ExternalReviewToolSet = true
+		dst.ExternalReviewers = ""
+		dst.ExternalReviewersSet = false
+	}
+	if src.ExternalReviewersSet || src.ExternalReviewers != "" {
+		dst.ExternalReviewers = src.ExternalReviewers
+		dst.ExternalReviewersSet = true
+		dst.ExternalReviewTool = ""
+		dst.ExternalReviewToolSet = false
 	}
 	if src.CustomReviewScriptSet || src.CustomReviewScript != "" {
 		dst.CustomReviewScript = src.CustomReviewScript

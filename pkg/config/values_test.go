@@ -2849,4 +2849,46 @@ func TestValues_mergeFrom_RunProfile(t *testing.T) {
 		assert.Equal(t, "claude-p", dst.RunProfileDefinitions[0].ClaudeCommand)
 		assert.Equal(t, "sonnet", dst.RunProfileDefinitions[0].TaskModel)
 	})
+
+	t.Run("same name external review tool clears inherited reviewers", func(t *testing.T) {
+		dst := Values{RunProfileDefinitions: []RunProfile{{
+			Name:                 "fast",
+			ExternalReviewers:    "codex,deepseek",
+			ExternalReviewersSet: true,
+		}}}
+		src := Values{RunProfileDefinitions: []RunProfile{{
+			Name:                  "fast",
+			ExternalReviewTool:    "none",
+			ExternalReviewToolSet: true,
+		}}}
+
+		dst.mergeFrom(&src)
+
+		require.Len(t, dst.RunProfileDefinitions, 1)
+		assert.Equal(t, "none", dst.RunProfileDefinitions[0].ExternalReviewTool)
+		assert.True(t, dst.RunProfileDefinitions[0].ExternalReviewToolSet)
+		assert.Empty(t, dst.RunProfileDefinitions[0].ExternalReviewers)
+		assert.False(t, dst.RunProfileDefinitions[0].ExternalReviewersSet)
+	})
+
+	t.Run("same name external reviewers clears inherited tool", func(t *testing.T) {
+		dst := Values{RunProfileDefinitions: []RunProfile{{
+			Name:                  "fast",
+			ExternalReviewTool:    "custom",
+			ExternalReviewToolSet: true,
+		}}}
+		src := Values{RunProfileDefinitions: []RunProfile{{
+			Name:                 "fast",
+			ExternalReviewers:    "codex,deepseek",
+			ExternalReviewersSet: true,
+		}}}
+
+		dst.mergeFrom(&src)
+
+		require.Len(t, dst.RunProfileDefinitions, 1)
+		assert.Equal(t, "codex,deepseek", dst.RunProfileDefinitions[0].ExternalReviewers)
+		assert.True(t, dst.RunProfileDefinitions[0].ExternalReviewersSet)
+		assert.Empty(t, dst.RunProfileDefinitions[0].ExternalReviewTool)
+		assert.False(t, dst.RunProfileDefinitions[0].ExternalReviewToolSet)
+	})
 }
