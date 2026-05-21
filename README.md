@@ -571,6 +571,9 @@ ralphex --wait=1h docs/plans/feature.md
 # use different models for tasks vs reviews (e.g., opus for tasks, sonnet for reviews)
 ralphex --task-model=opus --review-model=sonnet docs/plans/feature.md
 
+# activate a named run profile (selects claude_command, models, reviewers as one unit)
+ralphex --run-profile=claude-p-sonnet docs/plans/feature.md
+
 # use provider overrides for one run without editing config
 ralphex --claude-command=/path/to/codex-as-claude.sh --claude-args= --external-review-tool=custom --custom-review-script=/path/to/review.sh docs/plans/feature.md
 
@@ -609,6 +612,7 @@ ralphex --serve --port=3000 docs/plans/feature.md
 | `-t, --tasks-only` | Run only task phase, skip all reviews | false |
 | `-b, --base-ref` | Override default branch for review diffs (branch name or commit hash) | auto-detect |
 | `--skip-finalize` | Skip finalize step even if enabled in config | false |
+| `--run-profile` | Activate a named run profile defined in `[run_profile.<name>]` config section. Profile settings are applied after config files but before direct CLI flags, so other flags still override the profile | config/default |
 | `--task-model` | Model for task execution as `model[:effort]` (e.g., `opus`, `opus:high`, `:medium`). Effort values: `low`, `medium`, `high`, `xhigh`, `max`. Appended as `--model <m>` and/or `--effort <e>` to `claude_command`; custom wrappers may ignore or implement the flags | empty |
 | `--review-model` | Model for review phases as `model[:effort]` (falls back to `--task-model`). Same syntax and wrapper behavior as `--task-model` | empty |
 | `--claude-command` | Override the Claude-compatible command for this run | config/default |
@@ -847,6 +851,7 @@ Provider-related CLI flags (`--claude-command`, `--claude-args`, `--external-rev
 
 | Option | Description | Default |
 |--------|-------------|---------|
+| `run_profile` | Name of the active run profile. Selects a `[run_profile.<name>]` section that sets `claude_command`, `claude_args`, `task_model`, `review_model`, `external_reviewers`, `external_review_tool`, `custom_review_script` as one unit. Applied after config files, before CLI flags. Override with `--run-profile` | empty |
 | `claude_command` | Claude CLI command | `claude` |
 | `claude_args` | Claude CLI arguments | `--dangerously-skip-permissions --output-format stream-json --verbose` |
 | `task_model` | Model for task execution as `model[:effort]` (e.g., `opus`, `opus:high`, `:medium`). Effort: `low`, `medium`, `high`, `xhigh`, `max`. Appended as `--model <m>` and/or `--effort <e>` to `claude_command`; custom wrappers may ignore or implement the flags | empty |
@@ -1012,6 +1017,50 @@ When running ralphex in Docker, your script must be accessible inside the contai
 - Mount your scripts directory: `-v ~/.config/ralphex/scripts:/home/app/.config/ralphex/scripts:ro`
 - Ensure script dependencies are available (curl, jq, etc. are included in base image)
 - Environment variables (API keys) must be passed to container: `-e OPENROUTER_API_KEY`
+
+### Run Profiles
+
+A run profile bundles several execution settings — `claude_command`, `claude_args`, `task_model`, `review_model`, `external_reviewers`, `external_review_tool`, `custom_review_script` — under a single name so you can switch the full setup in one flag instead of overriding each field individually.
+
+**Precedence:** `CLI direct flags > CLI --run-profile > config run_profile > local config > global config > embedded defaults`
+
+This means `--run-profile=my-profile --claude-command=claude` first applies the profile, then overrides only `claude_command` from the direct flag.
+
+Define profiles in your config file:
+
+```ini
+# select a profile for all runs in this project
+run_profile = claude-p-sonnet
+
+[run_profile.claude-p-sonnet]
+claude_command = claude-p
+claude_args = --dangerously-skip-permissions --output-format stream-json --verbose
+task_model = sonnet
+review_model = sonnet
+external_reviewers = deepseek,codex
+```
+
+Or select one per invocation without touching config:
+
+```bash
+ralphex --run-profile=claude-p-sonnet docs/plans/feature.md
+```
+
+Any field omitted from the profile section falls back to the main config value, so a profile can override only the fields it cares about.
+
+**claude-p adapter example.** [`Equality-Machine/claude-p`](https://github.com/Equality-Machine/claude-p) is a `-p` compatibility adapter for Claude Code. It does not require a running proxy or `ANTHROPIC_BASE_URL`, making it safe to use directly:
+
+```ini
+[run_profile.claude-p-sonnet]
+claude_command = claude-p
+claude_args = --dangerously-skip-permissions --output-format stream-json --verbose
+task_model = sonnet
+review_model = sonnet
+```
+
+**Note on clarp.** `clarp` is a different tool that works via a local proxy and `ANTHROPIC_BASE_URL`. It is not the default recommended adapter for `-p` compatibility recovery and requires explicit setup before use with Claude Code. Use `Equality-Machine/claude-p` instead unless you have a specific reason to run a proxy.
+
+**Error on missing profile.** If `run_profile` names a profile that has no `[run_profile.<name>]` section, ralphex exits with an error before starting execution.
 
 ### Using Alternative Providers for Claude Phases
 

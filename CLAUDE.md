@@ -280,8 +280,10 @@ GOOS=windows GOARCH=amd64 go build ./...
 - Config file format: INI (using gopkg.in/ini.v1)
 - Embedded defaults in `pkg/config/defaults/`
 - Precedence: CLI flags > local config > global config > embedded defaults
+- Run profile precedence: `CLI direct flags > CLI --run-profile > config run_profile > local config > global config > embedded defaults`
 - Custom prompts: `~/.config/ralphex/prompts/*.txt` or `.ralphex/prompts/*.txt`
 - Custom agents: `~/.config/ralphex/agents/*.txt` or `.ralphex/agents/*.txt`
+- `run_profile` config option: name of the active run profile. Selects a `[run_profile.<name>]` section that bundles `claude_command`, `claude_args`, `task_model`, `review_model`, `external_reviewers`, `external_review_tool`, `custom_review_script` as one unit. CLI flag `--run-profile` takes precedence. Profile is applied after config files but before direct CLI flags, so `--run-profile=x --claude-command=foo` applies profile x then overrides only `claude_command`. Returns a clear error when the named profile is not defined. Parsed in `pkg/config/config.go:applyRunProfile`. Fields missing from a profile section fall back to main config. Disabled by default (empty)
 - `task_model` config option: model[:effort] for task execution (e.g., `opus`, `opus:high`, `:medium`). Effort values: `low`, `medium`, `high`, `xhigh`, `max`. CLI flag `--task-model` takes precedence. Parsed in `ParseModelEffort` (pkg/processor/runner.go), split on first colon. Appended to `claude_command` as `--model <m>` and/or `--effort <e>`; custom wrappers may ignore or implement the flags. Disabled by default (empty = Claude CLI defaults)
 - `review_model` config option: model[:effort] for review phases. Falls back to `task_model` if empty. CLI flag `--review-model` takes precedence. Same wrapper behavior and syntax as `task_model`. Disabled by default
 - `default_branch` config option: override auto-detected default branch for review diffs

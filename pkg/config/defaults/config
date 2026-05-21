@@ -105,6 +105,38 @@ external_review_tool = codex
 # custom_review_script =
 
 # ------------------------------------------------------------------------------
+# run profiles
+# ------------------------------------------------------------------------------
+
+# run_profile: name of the active run profile; selects a [run_profile.<name>] section
+# below. Profile settings are applied after config files and before CLI flags, so
+# direct CLI flags (e.g., --claude-command, --task-model) still override profile values.
+# leave empty or omit to use individual settings without a profile.
+# run_profile =
+
+# [run_profile.<name>] sections define named profiles.
+# supported fields: claude_command, claude_args, task_model, review_model,
+#   external_reviewers, external_review_tool, custom_review_script.
+# any field left out of the profile section falls back to the main config value.
+#
+# example — claude-p adapter pointing at Equality-Machine/claude-p:
+#
+# [run_profile.claude-p-sonnet]
+# claude_command = claude-p
+# claude_args = --dangerously-skip-permissions --output-format stream-json --verbose
+# task_model = sonnet
+# review_model = sonnet
+# external_reviewers = deepseek,codex
+#
+# NOTE: clarp (local proxy via ANTHROPIC_BASE_URL) is a different tool and is NOT
+# the recommended default adapter for claude -p compatibility recovery. Use
+# Equality-Machine/claude-p instead; it does not require a running proxy.
+#
+# usage:
+#   ralphex --run-profile=claude-p-sonnet docs/plans/feature.md
+#   (or set run_profile = claude-p-sonnet in config)
+
+# ------------------------------------------------------------------------------
 # finalize step
 # ------------------------------------------------------------------------------
 
