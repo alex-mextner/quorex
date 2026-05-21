@@ -118,6 +118,7 @@ external_review_tool = codex
 # supported fields: claude_command, claude_args, task_model, review_model,
 #   external_reviewers, external_review_tool, custom_review_script.
 # any field left out of the profile section falls back to the main config value.
+# a field present with an empty value clears the lower-precedence value for that profile.
 #
 # example — claude-p adapter pointing at Equality-Machine/claude-p:
 #
@@ -127,6 +128,10 @@ external_review_tool = codex
 # task_model = sonnet
 # review_model = sonnet
 # external_reviewers = deepseek,codex
+#
+# [external_reviewer.deepseek]
+# driver = script
+# script = ~/.config/ralphex/scripts/opencode-review.sh
 #
 # NOTE: clarp (local proxy via ANTHROPIC_BASE_URL) is a different tool and is NOT
 # the recommended default adapter for claude -p compatibility recovery. Use

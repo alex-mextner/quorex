@@ -127,7 +127,7 @@ Configuration directory: `~/.config/ralphex/` (override with `--config-dir` or `
 
 **Stalemate detection:** `review_patience` config option (or `--review-patience` CLI flag) terminates the external review loop early when Claude produces no commits for N consecutive rounds. Set to 0 (default) to disable. Useful when the external tool and Claude can't agree on findings.
 
-**Run profiles:** `run_profile` config option (or `--run-profile` CLI flag) selects a named `[run_profile.<name>]` section that bundles `claude_command`, `claude_args`, `task_model`, `review_model`, `external_reviewers`, `external_review_tool`, and `custom_review_script` as one unit. Precedence: `CLI direct flags > CLI --run-profile > config run_profile > local config > global config > embedded defaults`, so `--run-profile=x --claude-command=foo` applies profile x then overrides only `claude_command`. Returns an error if the named profile is not defined. Use `Equality-Machine/claude-p` for claude -p compatibility recovery — it does not require a proxy. `clarp` (proxy via `ANTHROPIC_BASE_URL`) is a separate tool and is not the default recommended adapter.
+**Run profiles:** `run_profile` config option (or `--run-profile` CLI flag) selects a named `[run_profile.<name>]` section that bundles `claude_command`, `claude_args`, `task_model`, `review_model`, `external_reviewers`, `external_review_tool`, and `custom_review_script` as one unit. Precedence: `CLI direct flags > CLI --run-profile > config run_profile > local config > global config > embedded defaults`, so `--run-profile=x --claude-command=foo` applies profile x then overrides only `claude_command`. Omitted profile fields fall back to main config; fields present with empty values clear lower-precedence values, e.g. `claude_args =`. Returns an error if the named profile is not defined. Use `Equality-Machine/claude-p` for claude -p compatibility recovery — it does not require a proxy. `clarp` (proxy via `ANTHROPIC_BASE_URL`) is a separate tool and is not the default recommended adapter.
 
 ```ini
 # in ~/.config/ralphex/config
@@ -139,6 +139,10 @@ claude_args = --dangerously-skip-permissions --output-format stream-json --verbo
 task_model = sonnet
 review_model = sonnet
 external_reviewers = deepseek,codex
+
+[external_reviewer.deepseek]
+driver = script
+script = ~/.config/ralphex/scripts/opencode-review.sh
 ```
 
 **Per-phase model configuration:** `task_model` config option (or `--task-model` CLI flag) sets the model for task execution using `model[:effort]` syntax. Examples: `opus` (model only), `opus:high` (both), `:medium` (effort only). Effort levels: `low`, `medium`, `high`, `xhigh`, `max`. `review_model` (or `--review-model`) sets the model/effort for review phases; falls back to `task_model` if empty. Parts are appended to the configured `claude_command` as `--model <m>` and/or `--effort <e>`. Custom wrappers may ignore the flags (default behavior via `*) shift ;;`) or map them to their own selection. Empty by default (uses Claude CLI's defaults).

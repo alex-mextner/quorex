@@ -1009,7 +1009,7 @@ Customize `~/.config/ralphex/prompts/custom_review.txt` to modify the prompt sen
 - `{{DEFAULT_BRANCH}}` - detected default branch (main, master, etc.)
 - `{{PREVIOUS_REVIEW_CONTEXT}}` - previous review context (empty on first iteration, populated on subsequent)
 
-Customize `~/.config/ralphex/prompts/custom_eval.txt` to modify how Claude evaluates your tool's output.
+Customize `~/.config/ralphex/prompts/custom_eval.txt` to modify how Claude evaluates your tool's output. When multiple `external_reviewers` run in parallel, Claude evaluates the combined reviewer output with `custom_eval.txt`; a single `codex` reviewer uses the Codex evaluation prompt.
 
 **Docker considerations:**
 
@@ -1038,6 +1038,10 @@ claude_args = --dangerously-skip-permissions --output-format stream-json --verbo
 task_model = sonnet
 review_model = sonnet
 external_reviewers = deepseek,codex
+
+[external_reviewer.deepseek]
+driver = script
+script = ~/.config/ralphex/scripts/opencode-review.sh
 ```
 
 Or select one per invocation without touching config:
@@ -1046,7 +1050,7 @@ Or select one per invocation without touching config:
 ralphex --run-profile=claude-p-sonnet docs/plans/feature.md
 ```
 
-Any field omitted from the profile section falls back to the main config value, so a profile can override only the fields it cares about.
+Any field omitted from the profile section falls back to the main config value, so a profile can override only the fields it cares about. A field present with an empty value intentionally clears the lower-precedence value, e.g. `claude_args =` suppresses default Claude arguments for that profile.
 
 **claude-p adapter example.** [`Equality-Machine/claude-p`](https://github.com/Equality-Machine/claude-p) is a `-p` compatibility adapter for Claude Code. It does not require a running proxy or `ANTHROPIC_BASE_URL`, making it safe to use directly:
 

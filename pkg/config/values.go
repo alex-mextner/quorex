@@ -66,6 +66,7 @@ type Values struct {
 
 	// run profile settings
 	RunProfile            string       // selected profile name (run_profile key)
+	RunProfileSet         bool         // tracks if run_profile was explicitly set
 	RunProfileDefinitions []RunProfile // all [run_profile.<name>] sections
 
 	// notification settings
@@ -385,6 +386,7 @@ func (vl *valuesLoader) parseValuesFromBytes(data []byte) (Values, error) {
 	// run profile settings
 	if key, err := section.GetKey("run_profile"); err == nil {
 		values.RunProfile = strings.TrimSpace(key.String())
+		values.RunProfileSet = true
 	}
 	values.RunProfileDefinitions = vl.parseRunProfileDefinitions(cfg)
 
@@ -596,8 +598,9 @@ func (dst *Values) mergeExtraFrom(src *Values) {
 		dst.IdleTimeout = src.IdleTimeout
 		dst.IdleTimeoutSet = true
 	}
-	if src.RunProfile != "" {
+	if src.RunProfileSet {
 		dst.RunProfile = src.RunProfile
+		dst.RunProfileSet = true
 	}
 	if len(src.RunProfileDefinitions) > 0 {
 		dst.RunProfileDefinitions = mergeRunProfileDefinitions(dst.RunProfileDefinitions, src.RunProfileDefinitions)
@@ -888,24 +891,31 @@ func (vl *valuesLoader) parseRunProfileDefinitions(cfg *ini.File) []RunProfile {
 		profile := RunProfile{Name: name}
 		if key, err := section.GetKey("claude_command"); err == nil {
 			profile.ClaudeCommand = strings.TrimSpace(key.String())
+			profile.ClaudeCommandSet = true
 		}
 		if key, err := section.GetKey("claude_args"); err == nil {
 			profile.ClaudeArgs = key.String()
+			profile.ClaudeArgsSet = true
 		}
 		if key, err := section.GetKey("task_model"); err == nil {
 			profile.TaskModel = strings.TrimSpace(key.String())
+			profile.TaskModelSet = true
 		}
 		if key, err := section.GetKey("review_model"); err == nil {
 			profile.ReviewModel = strings.TrimSpace(key.String())
+			profile.ReviewModelSet = true
 		}
 		if key, err := section.GetKey("external_reviewers"); err == nil {
 			profile.ExternalReviewers = strings.TrimSpace(key.String())
+			profile.ExternalReviewersSet = true
 		}
 		if key, err := section.GetKey("external_review_tool"); err == nil {
 			profile.ExternalReviewTool = strings.TrimSpace(key.String())
+			profile.ExternalReviewToolSet = true
 		}
 		if key, err := section.GetKey("custom_review_script"); err == nil {
 			profile.CustomReviewScript = expandTilde(strings.TrimSpace(key.String()))
+			profile.CustomReviewScriptSet = true
 		}
 		profiles = append(profiles, profile)
 	}

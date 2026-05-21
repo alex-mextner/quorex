@@ -129,6 +129,7 @@ type Config struct {
 
 	// run profile selection (applied before CLI direct flags)
 	RunProfile            string       `json:"run_profile"`             // selected profile name
+	RunProfileSet         bool         `json:"-"`                       // tracks if run_profile was explicitly set in config
 	RunProfileDefinitions []RunProfile `json:"run_profile_definitions"` // all defined profiles
 
 	configDir string // private, global config directory set by Load()
@@ -153,14 +154,21 @@ type ExternalReviewer struct {
 // A profile overrides the matching config fields when selected via run_profile
 // or --run-profile. Direct CLI flags still take precedence over profile values.
 type RunProfile struct {
-	Name               string `json:"name"`
-	ClaudeCommand      string `json:"claude_command,omitempty"`
-	ClaudeArgs         string `json:"claude_args,omitempty"`
-	TaskModel          string `json:"task_model,omitempty"`
-	ReviewModel        string `json:"review_model,omitempty"`
-	ExternalReviewers  string `json:"external_reviewers,omitempty"` // comma-separated reviewer names
-	ExternalReviewTool string `json:"external_review_tool,omitempty"`
-	CustomReviewScript string `json:"custom_review_script,omitempty"`
+	Name                  string `json:"name"`
+	ClaudeCommand         string `json:"claude_command,omitempty"`
+	ClaudeCommandSet      bool   `json:"-"`
+	ClaudeArgs            string `json:"claude_args,omitempty"`
+	ClaudeArgsSet         bool   `json:"-"`
+	TaskModel             string `json:"task_model,omitempty"`
+	TaskModelSet          bool   `json:"-"`
+	ReviewModel           string `json:"review_model,omitempty"`
+	ReviewModelSet        bool   `json:"-"`
+	ExternalReviewers     string `json:"external_reviewers,omitempty"` // comma-separated reviewer names
+	ExternalReviewersSet  bool   `json:"-"`
+	ExternalReviewTool    string `json:"external_review_tool,omitempty"`
+	ExternalReviewToolSet bool   `json:"-"`
+	CustomReviewScript    string `json:"custom_review_script,omitempty"`
+	CustomReviewScriptSet bool   `json:"-"`
 }
 
 // ColorConfig holds RGB values for output colors.
@@ -374,6 +382,7 @@ func loadConfigFromDirs(globalDir, localDir string) (*Config, error) {
 			CustomScript:  values.NotifyCustomScript,
 		},
 		RunProfile:            values.RunProfile,
+		RunProfileSet:         values.RunProfileSet,
 		RunProfileDefinitions: values.RunProfileDefinitions,
 		Colors:                colors,
 		TaskPrompt:            prompts.Task,
@@ -417,28 +426,28 @@ func (c *Config) ApplyProfile(profileName string) error {
 	if profile == nil {
 		return fmt.Errorf("run profile %q not found", profileName)
 	}
-	if profile.ClaudeCommand != "" {
+	if profile.ClaudeCommandSet || profile.ClaudeCommand != "" {
 		c.ClaudeCommand = profile.ClaudeCommand
 	}
-	if profile.ClaudeArgs != "" {
+	if profile.ClaudeArgsSet || profile.ClaudeArgs != "" {
 		c.ClaudeArgs = profile.ClaudeArgs
 		c.ClaudeArgsSet = true
 	}
-	if profile.TaskModel != "" {
+	if profile.TaskModelSet || profile.TaskModel != "" {
 		c.TaskModel = profile.TaskModel
 	}
-	if profile.ReviewModel != "" {
+	if profile.ReviewModelSet || profile.ReviewModel != "" {
 		c.ReviewModel = profile.ReviewModel
 	}
-	if profile.CustomReviewScript != "" {
+	if profile.CustomReviewScriptSet || profile.CustomReviewScript != "" {
 		c.CustomReviewScript = profile.CustomReviewScript
 	}
 	// external_reviewers and external_review_tool are mutually exclusive
-	if profile.ExternalReviewers != "" {
+	if profile.ExternalReviewersSet || profile.ExternalReviewers != "" {
 		names := ParseCommaSeparated(profile.ExternalReviewers)
 		c.ExternalReviewers = SelectExternalReviewers(names, c.ExternalReviewerDefinitions)
 		c.ExternalReviewTool = ""
-	} else if profile.ExternalReviewTool != "" {
+	} else if profile.ExternalReviewToolSet || profile.ExternalReviewTool != "" {
 		c.ExternalReviewTool = profile.ExternalReviewTool
 		c.ExternalReviewers = nil
 	}

@@ -1547,6 +1547,20 @@ func TestRunProfile_ApplyProfile(t *testing.T) {
 		assert.Equal(t, "haiku", cfg.ReviewModel)
 	})
 
+	t.Run("profile_can_clear_claude_args", func(t *testing.T) {
+		cfg := &Config{
+			ClaudeArgs: "--dangerously-skip-permissions --output-format stream-json --verbose",
+			RunProfileDefinitions: []RunProfile{
+				{Name: "wrapper-with-no-args", ClaudeArgs: "", ClaudeArgsSet: true},
+			},
+		}
+
+		require.NoError(t, cfg.ApplyProfile("wrapper-with-no-args"))
+
+		assert.Empty(t, cfg.ClaudeArgs)
+		assert.True(t, cfg.ClaudeArgsSet, "explicit empty claude_args must suppress lower-precedence defaults")
+	})
+
 	t.Run("run_profile_loaded_from_config", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		globalDir := filepath.Join(tmpDir, "global")

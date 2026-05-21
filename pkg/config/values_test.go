@@ -2553,11 +2553,13 @@ review_model = sonnet
 	require.NoError(t, err)
 
 	assert.Equal(t, "claude-p-sonnet", values.RunProfile)
+	assert.True(t, values.RunProfileSet)
 	require.Len(t, values.RunProfileDefinitions, 1)
 	p := values.RunProfileDefinitions[0]
 	assert.Equal(t, "claude-p-sonnet", p.Name)
 	assert.Equal(t, "claude-p", p.ClaudeCommand)
 	assert.Equal(t, "--dangerously-skip-permissions --output-format stream-json --verbose", p.ClaudeArgs)
+	assert.True(t, p.ClaudeArgsSet)
 	assert.Equal(t, "sonnet", p.TaskModel)
 	assert.Equal(t, "sonnet", p.ReviewModel)
 }
@@ -2574,6 +2576,7 @@ func TestValuesLoader_Load_RunProfile_NoProfile(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Empty(t, values.RunProfile)
+	assert.False(t, values.RunProfileSet)
 	assert.Empty(t, values.RunProfileDefinitions)
 }
 
@@ -2687,12 +2690,36 @@ task_model = opus
 	assert.Equal(t, "opus", byName["quality"].TaskModel)
 }
 
+func TestValuesLoader_Load_RunProfile_LocalEmptyClearsGlobal(t *testing.T) {
+	tmpDir := t.TempDir()
+	globalConfig := filepath.Join(tmpDir, "global")
+	localConfig := filepath.Join(tmpDir, "local")
+
+	globalContent := `
+run_profile = fast
+
+[run_profile.fast]
+task_model = haiku
+`
+	require.NoError(t, os.WriteFile(globalConfig, []byte(globalContent), 0o600))
+
+	localContent := `run_profile =`
+	require.NoError(t, os.WriteFile(localConfig, []byte(localContent), 0o600))
+
+	loader := newValuesLoader(defaultsFS)
+	values, err := loader.Load(localConfig, globalConfig)
+	require.NoError(t, err)
+
+	assert.Empty(t, values.RunProfile)
+}
+
 func TestValues_mergeFrom_RunProfile(t *testing.T) {
 	t.Run("merge run profile name", func(t *testing.T) {
 		dst := Values{RunProfile: "old"}
-		src := Values{RunProfile: "new"}
+		src := Values{RunProfile: "new", RunProfileSet: true}
 		dst.mergeFrom(&src)
 		assert.Equal(t, "new", dst.RunProfile)
+		assert.True(t, dst.RunProfileSet)
 	})
 
 	t.Run("empty source preserves existing", func(t *testing.T) {

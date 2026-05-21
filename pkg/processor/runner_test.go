@@ -2142,6 +2142,36 @@ func TestRunner_ExternalReviewers_CodexAndScript_Success(t *testing.T) {
 	assert.NotContains(t, evalPrompt, "Codex reviewed")
 }
 
+func TestRunner_ExternalReviewers_SingleCodexUsesCodexEvaluationPrompt(t *testing.T) {
+	log := newMockLogger("progress.txt")
+	claude := newMockExecutor([]executor.Result{
+		{Output: "done", Signal: processor.SignalCodexDone},
+	})
+	codex := newMockExecutor([]executor.Result{
+		{Output: "codex found issue in foo.go:10"},
+	})
+
+	appCfg := testAppConfig(t)
+	appCfg.ExternalReviewers = []config.ExternalReviewer{{Name: "codex", Driver: "codex"}}
+	appCfg.CodexPrompt = "CUSTOM CODEX EVAL: {{CODEX_OUTPUT}}"
+
+	cfg := processor.Config{
+		Mode:          processor.ModeCodexOnly,
+		MaxIterations: 50,
+		CodexEnabled:  true,
+		AppConfig:     appCfg,
+	}
+	r := processor.NewWithExecutors(cfg, log, processor.Executors{Claude: claude, Codex: codex}, &status.PhaseHolder{})
+	err := r.Run(t.Context())
+	require.NoError(t, err)
+
+	require.Len(t, claude.RunCalls(), 1)
+	evalPrompt := claude.RunCalls()[0].Prompt
+	assert.Contains(t, evalPrompt, "CUSTOM CODEX EVAL")
+	assert.Contains(t, evalPrompt, "codex found issue in foo.go:10")
+	assert.NotContains(t, evalPrompt, "Custom reviewed the code")
+}
+
 func TestRunner_ExternalReviewers_NoneWithOtherReviewerFails(t *testing.T) {
 	log := newMockLogger("progress.txt")
 	claude := newMockExecutor(nil)
