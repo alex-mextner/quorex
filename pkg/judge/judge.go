@@ -50,7 +50,7 @@ func ParseMatrix(output string, providers []string) Matrix {
 	scores := make(map[string]map[string]bool)
 	var categories []string
 
-	for _, line := range strings.Split(output, "\n") {
+	for line := range strings.SplitSeq(output, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "```") {
 			continue

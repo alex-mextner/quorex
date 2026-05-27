@@ -34,9 +34,9 @@ func TestWorktreeManager_Diff(t *testing.T) {
 	wm := pool.NewWorktreeManager(dir)
 	wt, err := wm.Create("claude", "run-002")
 	require.NoError(t, err)
-	defer wm.Remove(wt) //nolint:errcheck
+	defer wm.Remove(wt) //nolint:errcheck // test cleanup
 
-	err = os.WriteFile(filepath.Join(wt.Path, "hello.txt"), []byte("hello\n"), 0o644)
+	err = os.WriteFile(filepath.Join(wt.Path, "hello.txt"), []byte("hello\n"), 0o600)
 	require.NoError(t, err)
 
 	diff, err := wm.Diff(wt)

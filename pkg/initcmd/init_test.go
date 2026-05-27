@@ -31,7 +31,7 @@ func TestDetectHarness_FallbackToCodex(t *testing.T) {
 func TestDetectHarness_None(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 	harness := initcmd.DetectHarness()
-	assert.Equal(t, "", harness)
+	assert.Empty(t, harness)
 }
 
 func TestInstallInstructions(t *testing.T) {
@@ -44,5 +44,5 @@ func TestInstallInstructions(t *testing.T) {
 func createFakeBin(t *testing.T, dir, name string) {
 	t.Helper()
 	path := filepath.Join(dir, name)
-	require.NoError(t, os.WriteFile(path, []byte("#!/bin/sh\necho ok\n"), 0o755))
+	require.NoError(t, os.WriteFile(path, []byte("#!/bin/sh\necho ok\n"), 0o755)) //nolint:gosec // fake binary must be executable
 }

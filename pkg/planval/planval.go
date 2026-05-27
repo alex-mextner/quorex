@@ -28,10 +28,10 @@ func Validate(data []byte) []ValidationError {
 		line := scanner.Text()
 
 		// track code fences (``` markers)
-		if strings.HasPrefix(line, "```") {
+		if marker, ok := strings.CutPrefix(line, "```"); ok {
 			if fenceOpen == 0 {
 				fenceOpen = lineNum
-				fenceLang = strings.TrimPrefix(line, "```")
+				fenceLang = marker
 			} else {
 				fenceOpen = 0
 				fenceLang = ""
@@ -44,15 +44,11 @@ func Validate(data []byte) []ValidationError {
 		}
 
 		// all ## headings in a plan must use "## Task: <name>" format.
-		if strings.HasPrefix(line, "## ") {
-			content := strings.TrimPrefix(line, "## ")
+		if content, ok := strings.CutPrefix(line, "## "); ok {
 			if !strings.HasPrefix(content, "Task: ") {
 				errs = append(errs, ValidationError{
 					Line: lineNum,
-					Message: fmt.Sprintf(
-						"task section missing required header format\n  Expected: ## Task: <name>\n  Found:    ## %s",
-						content,
-					),
+					Message: "task section missing required header format\n  Expected: ## Task: <name>\n  Found:    ## " + content,
 				})
 			}
 		}

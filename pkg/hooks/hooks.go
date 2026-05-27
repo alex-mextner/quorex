@@ -49,7 +49,7 @@ func (r *Runner) RunPost(ctx context.Context, worktreeDir string) error {
 }
 
 func (r *Runner) run(ctx context.Context, h quorexcfg.HookDef, dir string) error {
-	cmd := exec.CommandContext(ctx, h.Command, h.Args...) //nolint:gosec // user-configured hooks
+	cmd := exec.CommandContext(ctx, h.Command, h.Args...)
 	cmd.Dir = dir
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("exit error: %w\noutput: %s", err, out)

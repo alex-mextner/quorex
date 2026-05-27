@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -52,21 +53,18 @@ func New(cfg Config) *Pool {
 // On transient failure retries up to cfg.ProviderRetries times.
 // On quota/billing failure marks IsQuotaError and skips retries.
 func (p *Pool) Run(ctx context.Context, prompt string) ([]Result, error) {
-	runID := fmt.Sprintf("%d", time.Now().UnixMilli())
+	runID := strconv.FormatInt(time.Now().UnixMilli(), 10)
 
 	sem := make(chan struct{}, p.cfg.Parallel)
 	resultCh := make(chan Result, len(p.cfg.Executors))
 
 	var wg sync.WaitGroup
 	for _, ex := range p.cfg.Executors {
-		wg.Add(1)
-		ex := ex
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			sem <- struct{}{}
 			defer func() { <-sem }()
 			resultCh <- p.runOne(ctx, ex, runID, prompt)
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -122,7 +120,7 @@ func (p *Pool) runOne(ctx context.Context, ex *quorexcfg.ExecutorDef, runID, pro
 }
 
 func (p *Pool) execInWorktree(ctx context.Context, ex *quorexcfg.ExecutorDef, wt *Worktree, prompt string) (string, error) {
-	cmd := exec.CommandContext(ctx, ex.Command, ex.Args...) //nolint:gosec
+	cmd := exec.CommandContext(ctx, ex.Command, ex.Args...)
 	cmd.Dir = wt.Path
 	if prompt != "" {
 		cmd.Stdin = strings.NewReader(prompt)
@@ -135,7 +133,7 @@ func (p *Pool) execInWorktree(ctx context.Context, ex *quorexcfg.ExecutorDef, wt
 func (p *Pool) CleanupWorktrees(results []Result) {
 	for _, r := range results {
 		if r.Worktree != nil {
-			p.wm.Remove(r.Worktree) //nolint:errcheck
+			p.wm.Remove(r.Worktree) //nolint:errcheck // best-effort cleanup
 		}
 	}
 }

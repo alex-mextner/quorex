@@ -32,7 +32,7 @@ func TestPool_RunParallel_AllSucceed(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, results, 2)
 	for _, r := range results {
-		assert.NoError(t, r.Err)
+		require.NoError(t, r.Err)
 		assert.NotEmpty(t, r.Output)
 	}
 	p.CleanupWorktrees(results)
@@ -44,15 +44,13 @@ func TestPool_RunParallel_OneFailsRetrySucceeds(t *testing.T) {
 
 	// script fails on first call, succeeds on second
 	scriptPath := filepath.Join(dir, "flaky.sh")
-	err := os.WriteFile(scriptPath, []byte(`#!/bin/sh
-counter_file="$(dirname "$0")/count"
-count=0
-[ -f "$counter_file" ] && count=$(cat "$counter_file")
-count=$((count+1))
-printf '%d' $count > "$counter_file"
-if [ "$count" -eq 1 ]; then exit 1; fi
-echo "success on attempt $count"
-`), 0o755)
+	script := "#!/bin/sh\ncounter_file=\"$(dirname \"$0\")/count\"\ncount=0\n" +
+		"[ -f \"$counter_file\" ] && count=$(cat \"$counter_file\")\ncount=$((count+1))\n" +
+		"printf '%d' $count > \"$counter_file\"\nif [ \"$count\" -eq 1 ]; then exit 1; fi\n" +
+		"echo \"success on attempt $count\"\n"
+	err := os.WriteFile(scriptPath, []byte(script), 0o600)
+	require.NoError(t, err)
+	require.NoError(t, os.Chmod(scriptPath, 0o755)) //nolint:gosec // test script must be executable
 	require.NoError(t, err)
 
 	executors := []*quorexcfg.ExecutorDef{
@@ -69,7 +67,7 @@ echo "success on attempt $count"
 	results, err := p.Run(context.Background(), "prompt")
 	require.NoError(t, err)
 	require.Len(t, results, 1)
-	assert.NoError(t, results[0].Err)
+	require.NoError(t, results[0].Err)
 	assert.Contains(t, results[0].Output, "success on attempt 2")
 	p.CleanupWorktrees(results)
 }
@@ -92,7 +90,7 @@ func TestPool_QuotaError_NoRetry(t *testing.T) {
 	results, err := p.Run(context.Background(), "prompt")
 	require.NoError(t, err)
 	require.Len(t, results, 1)
-	assert.Error(t, results[0].Err)
+	require.Error(t, results[0].Err)
 	assert.True(t, results[0].IsQuotaError)
 	p.CleanupWorktrees(results)
 }
