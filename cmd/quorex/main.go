@@ -20,9 +20,11 @@ import (
 
 	"github.com/alex-mextner/quorex/pkg/config"
 	"github.com/alex-mextner/quorex/pkg/git"
+	"github.com/alex-mextner/quorex/pkg/initcmd"
 	"github.com/alex-mextner/quorex/pkg/input"
 	"github.com/alex-mextner/quorex/pkg/notify"
 	"github.com/alex-mextner/quorex/pkg/plan"
+	"github.com/alex-mextner/quorex/pkg/planval"
 	"github.com/alex-mextner/quorex/pkg/processor"
 	"github.com/alex-mextner/quorex/pkg/progress"
 	"github.com/alex-mextner/quorex/pkg/status"
@@ -179,7 +181,24 @@ func (c *worktreeCleanupFn) call() {
 
 func main() {
 	if os.Getenv("GO_FLAGS_COMPLETION") == "" {
-		fmt.Printf("ralphex %s\n", resolveVersion())
+		fmt.Printf("quorex %s\n", resolveVersion())
+	}
+
+	// handle quorex subcommands before flag parsing
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "plans":
+			runPlansCmd(os.Args[2:])
+			return
+		case "init":
+			harness := initcmd.DetectHarness()
+			if harness == "" {
+				fmt.Println(initcmd.InstallInstructions())
+				os.Exit(1)
+			}
+			fmt.Printf("Detected harness: %s\nRun '%s' in your project to generate quorex.toml.\n", harness, harness)
+			return
+		}
 	}
 
 	var o opts
@@ -1347,6 +1366,54 @@ func resolveDefaultBranch(cliRef, configBranch, autoDetected string) string {
 
 // ensureRepoHasCommits checks that the repository has at least one commit.
 // If the repository is empty, prompts the user to create an initial commit.
+// runPlansCmd handles "quorex plans <subcommand> [args]".
+func runPlansCmd(args []string) {
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "usage: quorex plans fix <file>")
+		os.Exit(1)
+	}
+	switch args[0] {
+	case "fix":
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stderr, "usage: quorex plans fix <file>")
+			os.Exit(1)
+		}
+		runPlansFix(args[1])
+	default:
+		fmt.Fprintf(os.Stderr, "unknown plans subcommand: %s\n", args[0])
+		os.Exit(1)
+	}
+}
+
+func runPlansFix(filePath string) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "read plan: %v\n", err)
+		os.Exit(1)
+	}
+	errs := planval.Validate(data)
+	if len(errs) == 0 {
+		fmt.Println("plan file is valid")
+		return
+	}
+	fmt.Print(planval.FormatErrors(filePath, errs))
+
+	harness := initcmd.DetectHarness()
+	if harness == "" {
+		fmt.Fprintln(os.Stderr, "no AI harness available to auto-fix; install claude, codex, or opencode")
+		os.Exit(1)
+	}
+
+	fmt.Printf("Auto-fixing with %s...\n", harness)
+	fixCmd := exec.Command(harness, "--print", "Fix the plan file format issues listed above in "+filePath) //nolint:gosec
+	fixCmd.Stdout = os.Stdout
+	fixCmd.Stderr = os.Stderr
+	if runErr := fixCmd.Run(); runErr != nil {
+		fmt.Fprintf(os.Stderr, "auto-fix failed: %v\n", runErr)
+		os.Exit(1)
+	}
+}
+
 func ensureRepoHasCommits(ctx context.Context, gitSvc *git.Service, stdin io.Reader, stdout io.Writer) error {
 	// track if we actually created a commit
 	createdCommit := false
