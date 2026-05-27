@@ -6,6 +6,7 @@
 *.dylib
 .bin/
 /ralphex
+/quorex
 
 # test files
 *.test
@@ -61,6 +62,7 @@ site/.venv/
 # python
 __pycache__/
 
-# ralphex progress logs
+# quorex worktrees (created at runtime)
+.quorex/worktrees/
 .ralphex/worktrees/
 AGENTS.md

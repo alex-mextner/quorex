@@ -1367,25 +1367,35 @@ func resolveDefaultBranch(cliRef, configBranch, autoDetected string) string {
 // ensureRepoHasCommits checks that the repository has at least one commit.
 // If the repository is empty, prompts the user to create an initial commit.
 // runPlansCmd handles "quorex plans <subcommand> [args]".
+// Usage:
+//
+//	quorex plans fix <file>          — validate only; exit 1 if invalid
+//	quorex plans fix --auto <file>   — validate; if invalid, invoke harness to auto-fix
 func runPlansCmd(args []string) {
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: quorex plans fix <file>")
+		fmt.Fprintln(os.Stderr, "usage: quorex plans fix [--auto] <file>")
 		os.Exit(1)
 	}
 	switch args[0] {
 	case "fix":
-		if len(args) < 2 {
-			fmt.Fprintln(os.Stderr, "usage: quorex plans fix <file>")
+		rest := args[1:]
+		autoFix := false
+		if len(rest) > 0 && rest[0] == "--auto" {
+			autoFix = true
+			rest = rest[1:]
+		}
+		if len(rest) < 1 {
+			fmt.Fprintln(os.Stderr, "usage: quorex plans fix [--auto] <file>")
 			os.Exit(1)
 		}
-		runPlansFix(args[1])
+		runPlansFix(rest[0], autoFix)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown plans subcommand: %s\n", args[0])
 		os.Exit(1)
 	}
 }
 
-func runPlansFix(filePath string) {
+func runPlansFix(filePath string, autoFix bool) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "read plan: %v\n", err)
@@ -1397,6 +1407,10 @@ func runPlansFix(filePath string) {
 		return
 	}
 	fmt.Print(planval.FormatErrors(filePath, errs))
+
+	if !autoFix {
+		os.Exit(1)
+	}
 
 	harness := initcmd.DetectHarness()
 	if harness == "" {

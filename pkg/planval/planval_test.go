@@ -54,6 +54,13 @@ func TestValidate_MultipleErrors(t *testing.T) {
 	assert.Len(t, errs, 2) // bad header + unclosed fence
 }
 
+func TestValidate_EmptyTaskName(t *testing.T) {
+	// regression: "## Task: " (trailing space only) must be rejected
+	errs := planval.Validate([]byte("# Feature\n\n## Task: \n\ndesc\n"))
+	require.Len(t, errs, 1)
+	assert.Contains(t, errs[0].Message, "Task:")
+}
+
 func TestValidate_FenceInsideSection_NotFlagged(t *testing.T) {
 	// headings inside fences should not be checked
 	plan := "# Feature\n\n## Task: foo\n\n```md\n## task bar\n```\n"

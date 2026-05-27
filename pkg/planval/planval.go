@@ -43,9 +43,10 @@ func Validate(data []byte) []ValidationError {
 			continue // inside fence: skip heading checks
 		}
 
-		// all ## headings in a plan must use "## Task: <name>" format.
+		// all ## headings in a plan must use "## Task: <name>" format with non-empty name.
 		if content, ok := strings.CutPrefix(line, "## "); ok {
-			if !strings.HasPrefix(content, "Task: ") {
+			taskName, hasPrefix := strings.CutPrefix(content, "Task: ")
+			if !hasPrefix || strings.TrimSpace(taskName) == "" {
 				errs = append(errs, ValidationError{
 					Line: lineNum,
 					Message: "task section missing required header format\n  Expected: ## Task: <name>\n  Found:    ## " + content,
