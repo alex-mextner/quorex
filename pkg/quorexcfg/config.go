@@ -218,6 +218,19 @@ func (c *Config) ResolveTaskExecutors() []*ExecutorDef {
 	return result
 }
 
+// ResolveReviewExecutor returns the first available review executor, falling back to the claude built-in.
+func (c *Config) ResolveReviewExecutor() *ExecutorDef {
+	for _, name := range c.Pool.ReviewExecutors {
+		if e, ok := c.Executors[name]; ok && e.Enabled {
+			return e
+		}
+	}
+	if e, ok := c.Executors["claude"]; ok {
+		return e
+	}
+	return &ExecutorDef{Name: "claude", Command: "claude"}
+}
+
 // HooksForPhase returns all hooks matching the given phase.
 func (c *Config) HooksForPhase(phase Phase) []HookDef {
 	var out []HookDef

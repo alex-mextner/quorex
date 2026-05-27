@@ -25,8 +25,11 @@ import (
 	"github.com/alex-mextner/quorex/pkg/notify"
 	"github.com/alex-mextner/quorex/pkg/plan"
 	"github.com/alex-mextner/quorex/pkg/planval"
+	"github.com/alex-mextner/quorex/pkg/pool"
 	"github.com/alex-mextner/quorex/pkg/processor"
 	"github.com/alex-mextner/quorex/pkg/progress"
+	"github.com/alex-mextner/quorex/pkg/quorexcfg"
+	"github.com/alex-mextner/quorex/pkg/runner"
 	"github.com/alex-mextner/quorex/pkg/status"
 	"github.com/alex-mextner/quorex/pkg/web"
 )
@@ -187,6 +190,14 @@ func main() {
 	// handle quorex subcommands before flag parsing
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
+		case "run":
+			ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+			defer cancel()
+			if err := runRunCmd(ctx, os.Args[2:]); err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				os.Exit(1)
+			}
+			return
 		case "plans":
 			runPlansCmd(os.Args[2:])
 			return
@@ -1426,6 +1437,90 @@ func runPlansFix(filePath string, autoFix bool) {
 		fmt.Fprintf(os.Stderr, "auto-fix failed: %v\n", runErr)
 		os.Exit(1)
 	}
+}
+
+// runRunCmd implements "quorex run <plan-file>":
+// validates plan → pre-hooks → parallel pool → post-hooks → judge eval → synthesis.
+func runRunCmd(ctx context.Context, args []string) error {
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "usage: quorex run <plan-file>")
+		return fmt.Errorf("plan file required")
+	}
+	planFile := args[0]
+
+	// Load quorex.toml from working directory; fall back to built-in defaults only when absent.
+	qcfg, err := quorexcfg.LoadFile("quorex.toml")
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("load quorex.toml: %w", err)
+		}
+		qcfg, _ = quorexcfg.Parse(nil) //nolint:errcheck // empty input always succeeds
+	}
+
+	data, err := os.ReadFile(planFile) //nolint:gosec // user-provided path
+	if err != nil {
+		return fmt.Errorf("read plan: %w", err)
+	}
+	if errs := planval.Validate(data); len(errs) > 0 {
+		fmt.Fprint(os.Stderr, planval.FormatErrors(planFile, errs))
+		return fmt.Errorf("invalid plan file")
+	}
+
+	repoDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("getwd: %w", err)
+	}
+
+	r := runner.New(qcfg, repoDir)
+	result, err := r.Run(ctx, string(data))
+	if err != nil {
+		return err
+	}
+	defer r.Cleanup(result.PoolResults)
+
+	// Single provider (degenerate case): apply its diff directly to the main checkout.
+	if result.SynthesisPrompt == "" {
+		return applySingleResult(repoDir, result)
+	}
+
+	// Multiple providers: synthesise via the full ralphex loop.
+	return runSynthesis(ctx, result)
+}
+
+// applySingleResult applies the first successful pool worktree's diff to the main checkout.
+func applySingleResult(repoDir string, result *runner.Result) error {
+	wm := pool.NewWorktreeManager(repoDir)
+	for _, res := range result.PoolResults {
+		if res.Err == nil && res.Worktree != nil {
+			return wm.Apply(res.Worktree)
+		}
+	}
+	return fmt.Errorf("no successful result to apply")
+}
+
+// runSynthesis creates a synthetic plan file and runs the full ralphex pipeline
+// using the review executor, giving synthesis the same loop mechanics as a normal task.
+func runSynthesis(ctx context.Context, result *runner.Result) error {
+	f, err := os.CreateTemp("", "quorex-synthesis-*.md")
+	if err != nil {
+		return fmt.Errorf("create synthesis plan: %w", err)
+	}
+	defer os.Remove(f.Name())
+
+	fmt.Fprintf(f, "# Synthesis Plan\n\n## Task: synthesize\n\n%s\n", result.SynthesisPrompt)
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("write synthesis plan: %w", err)
+	}
+
+	reviewExec := result.ReviewExecutor
+	synthOpts := opts{
+		PlanFile:         f.Name(),
+		ClaudeCommand:    reviewExec.Command,
+		ClaudeArgs:       strings.Join(reviewExec.Args, " "),
+		claudeCommandSet: true,
+		claudeArgsSet:    true,
+	}
+	return run(ctx, synthOpts)
 }
 
 func ensureRepoHasCommits(ctx context.Context, gitSvc *git.Service, stdin io.Reader, stdout io.Writer) error {
