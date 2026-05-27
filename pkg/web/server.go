@@ -16,7 +16,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/umputun/ralphex/pkg/plan"
+	"github.com/alex-mextner/quorex/pkg/plan"
 )
 
 //go:embed templates static

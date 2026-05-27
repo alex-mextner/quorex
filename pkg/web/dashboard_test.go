@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/umputun/ralphex/pkg/progress"
-	"github.com/umputun/ralphex/pkg/status"
+	"github.com/alex-mextner/quorex/pkg/progress"
+	"github.com/alex-mextner/quorex/pkg/status"
 )
 
 func TestNewDashboard(t *testing.T) {

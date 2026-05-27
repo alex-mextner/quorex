@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/umputun/ralphex/pkg/input"
-	"github.com/umputun/ralphex/pkg/progress"
+	"github.com/alex-mextner/quorex/pkg/input"
+	"github.com/alex-mextner/quorex/pkg/progress"
 )
 
 // datePrefixRe matches date-like prefixes in plan filenames (e.g., "2024-01-15-").

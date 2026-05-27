@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/umputun/ralphex/pkg/status"
+	"github.com/alex-mextner/quorex/pkg/status"
 )
 
 func TestNewServer(t *testing.T) {

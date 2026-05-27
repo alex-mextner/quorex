@@ -6,8 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/umputun/ralphex/pkg/status"
-	"github.com/umputun/ralphex/pkg/web/mocks"
+	"github.com/alex-mextner/quorex/pkg/status"
+	"github.com/alex-mextner/quorex/pkg/web/mocks"
 )
 
 func TestNewBroadcastLogger(t *testing.T) {

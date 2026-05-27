@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/umputun/ralphex/pkg/status"
+	"github.com/alex-mextner/quorex/pkg/status"
 )
 
 // signal constants are aliases to the shared status package for convenience within processor.

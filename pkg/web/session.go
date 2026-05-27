@@ -10,7 +10,7 @@ import (
 
 	"github.com/tmaxmax/go-sse"
 
-	"github.com/umputun/ralphex/pkg/status"
+	"github.com/alex-mextner/quorex/pkg/status"
 )
 
 // DefaultReplayerSize is the maximum number of events to keep for replay to late-joining clients.

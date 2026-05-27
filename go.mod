@@ -1,4 +1,4 @@
-module github.com/umputun/ralphex
+module github.com/alex-mextner/quorex
 
 go 1.26
 
