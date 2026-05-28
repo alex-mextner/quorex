@@ -54,7 +54,9 @@ func (m *WorktreeManager) Diff(wt *Worktree) (string, error) {
 		return "", fmt.Errorf("git add in worktree %s: %w\n%s", wt.ExecutorName, err, out)
 	}
 
-	diffCmd := exec.Command("git", "diff", "--cached", "HEAD") //nolint:noctx // lifecycle op
+	// Use -c diff.noprefix=false to ensure standard a/ b/ prefixes regardless of user git config.
+	// git apply uses -p1 by default, which expects one path component to strip.
+	diffCmd := exec.Command("git", "-c", "diff.noprefix=false", "diff", "--cached", "HEAD") //nolint:noctx // lifecycle op
 	diffCmd.Dir = wt.Path
 	out, err := diffCmd.Output()
 	if err != nil {
