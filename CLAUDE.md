@@ -2,6 +2,15 @@
 
 Autonomous plan execution with Claude Code - Go rewrite of ralph.py.
 
+> **Portable dev rules live in the global agent-tools skills:**
+> github.com/alex-mextner/agent-tools (`skills/universal/` + `skills/by-type/cli`).
+> Generic discipline — atomic commits, pre-commit gate, AI review before commit,
+> dead-code investigation, TDD red-first, structured exit codes, worktree isolation — lives
+> there. This file is almost entirely **ralphex-specific** product knowledge (config options,
+> package internals, prompts, signals, providers, the e2e toy-project gate); keep all of it.
+> The generic items in the "Before Submitting a PR" checklist below are the skill content
+> applied to this repo. Read both.
+
 ## LLM Documentation
 
 See @llms.txt for usage instructions and Claude Code integration commands.
