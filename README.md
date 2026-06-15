@@ -1,3 +1,10 @@
+> # ⚠️ ARCHIVED — superseded by [review-cli](https://github.com/alex-mextner/review-cli)
+>
+> This project is no longer maintained. Its replacement is **review-cli**
+> (https://github.com/alex-mextner/review-cli). The repository is archived and read-only.
+
+---
+
 <p align="center">
   <img src="assets/ralphex-wordmark-split.png" alt="ralphex" width="400">
 </p>
